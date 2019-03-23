@@ -11,6 +11,7 @@
 #include <sdl2/SDL.h>
 #include <iostream>
 
+#define VSYNC(x) SDL_GL_SetSwapInterval(x)
 #define WIDTH 1024
 #define HEIGHT 720
 
@@ -35,27 +36,36 @@ main()
         if (Window)
         {
             SDL_GLContext WindowContext = SDL_GL_CreateContext(Window);
-
+            if (VSYNC(-1) < 0) VSYNC(1);
             if (WindowContext)
             {
                 gladLoadGLLoader(SDL_GL_GetProcAddress);
                 glViewport(0, 0, WIDTH, HEIGHT);
+                glClearColor(0, 0, 0, 1);
                 
-                bool color = 0;
-                while (1)
+                bool Running = true;
+                Uint32 currentTime = 0;
+                Uint32 lastFrameTime = SDL_GetTicks();
+                while (Running)
                 {
-                    SDL_Delay(1000);
-                    if (color)
+                    SDL_Event e;
+                    if (SDL_PollEvent(&e))
                     {
-                        glClearColor(0, 0, 0, 1);
+                        switch (e.type)
+                        {
+                            case SDL_QUIT:
+                                Running = false;
+                                break;
+                            default: break;
+                        }
                     }
-                    else
-                    {
-                        glClearColor(1, 1, 1, 1);
-                    }
-                    color = !color;
+
                     glClear(GL_COLOR_BUFFER_BIT);
                     SDL_GL_SwapWindow(Window);
+
+                    currentTime = SDL_GetTicks();
+                    SDL_Log("frame time: %u", currentTime - lastFrameTime);
+                    lastFrameTime = currentTime;
                 }
             }
             else
@@ -74,6 +84,5 @@ main()
         SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
     }
 
-    SDL_Quit();
     return 0;
 }
