@@ -14,17 +14,27 @@
 #endif
 
 #if SELFX_INTERNAL
-#define ThrowErrorAndExit(error, ...) { printf("[ERROR]" ## error, __VA_ARGS__); std::cin.get(); exit(EXIT_FAILURE); }
+#define ThrowErrorAndExit(error, ...) { printf("[ERROR]" ## error, __VA_ARGS__); std::cin.ignore(); exit(EXIT_FAILURE); }
 #else
 #define ThrowErrorAndExit(error, ...)
 #endif
 
 #define BUFFER_OFFSET(x) ( (void *) 0)
 
+struct mesh_data
+{
+    GLfloat *vertices;
+    GLuint  *indices;
+    GLuint   nIndices;
+    GLuint   nVertices;
+    GLuint   vao;
+    GLuint   bo[2];
+};
+
 struct shader_source
 {
-    Uint32 length;
-    GLchar* data;
+    Uint32  length;
+    GLchar *data;
 };
 
 

@@ -5,7 +5,7 @@ REM setlocal EnableDelayedExpansion
 REM TODO - can we just build both with one exe?
 
 REM -wd4201 -wd4189 -wd4456
-set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHsc -Od -Oi -WX -W4 -wd4100 -wd4996 -DSELFX_INTERNAL=1 -DSELFX_SLOW=1 -DSELFX_WIN32=1 -FAsc -Z7 -Fmwin32_selfmadex.map -I..\lib\include
+set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHsc -Od -Oi -WX -W4 -wd4100 -wd4996 -DSELFX_DEBUG=1 -DSELFX_INTERNAL=1 -DSELFX_SLOW=1 -DSELFX_WIN32=1 -FAsc -Z7 -Fmwin32_selfmadex.map -I..\lib\include
 set CommonLinkerFlags=-opt:ref ../lib/SDL2.lib
 
 IF NOT EXIST ..\build mkdir ..\build

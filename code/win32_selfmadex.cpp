@@ -10,6 +10,9 @@
 #include "glad.c"
 #include <sdl2/SDL.h>
 
+// NOTE(dave): WIN32_LEAN_AND_MEAN already defined by glad.c
+#include <windows.h>
+
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -25,8 +28,62 @@
 #define local_persist static
 #define global_variable static
 
+#include "win32_selfmadex.h"
 #include "common_selfmadex.h"
 #include "common_selfmadex.cpp"
+
+internal inline void*
+Win32VirtualAlloc(SIZE_T size)
+{
+    LPVOID r = VirtualAlloc(0, size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+#if SELFX_DEBUG
+    if (!r)
+    {
+        char *buf;
+        FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER|FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS,
+            0, GetLastError(), 0, (LPSTR) &buf, 0, 0);
+
+        ThrowErrorAndExit("Allocating virtual memory:\n%s", buf);
+    }
+#endif
+    return r;
+}
+
+internal inline bool
+Win32VirtualFree(void *p)
+{
+    return VirtualFree(p, 0, MEM_RELEASE);
+}
+
+// TODO(dave): Make this platform dependant and DON'T USE STREAMS!!
+internal debug_file
+Win32ReadFile(const char* filename)
+{
+    debug_file File = { };
+
+    std::ifstream stream;
+    stream.open(filename, std::ifstream::in | std::ifstream::ate);
+    if (stream.is_open())
+    {
+        File.length = (Uint32)stream.tellg();
+        if (File.length > 0)
+        {
+            stream.seekg(0);
+            File.data = (GLchar *) Win32VirtualAlloc(File.length * sizeof(GLchar));
+            stream.read(File.data, File.length);
+            stream.close();
+        }
+        else ThrowErrorAndExit("Reading %s", filename);
+    }
+    else
+    {
+        // TODO(dave): Logging
+        ThrowErrorAndExit("Opening %s", filename);
+    }
+
+    return File;
+}
 
 inline void
 LogProgramLinking(GLuint p)
@@ -84,35 +141,11 @@ main()
                 glUseProgram(Program);
                 glDeleteShader(Vshader);
                 glDeleteShader(Fshader);
+                glDisable(GL_CULL_FACE);
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+                mesh_data cubefloor = ImportOBJ("cubefloor.obj");
                 
-
-                GLfloat VertexData[] =
-                {
-                    -0.5f, -0.5f,
-                     0.5f, -0.5f,
-                     0.5f,  0.5f,
-                    -0.5f,  0.5f
-                };
-                GLuint IndexData[] =
-                {
-                    0, 1, 2,
-                    2, 3, 0
-                };
-
-                GLuint BO[2], VAO;
-                glGenVertexArrays(1, &VAO);
-                glBindVertexArray(VAO);
-                
-                glGenBuffers(2, BO);
-                glBindBuffer(GL_ARRAY_BUFFER, BO[VERTEX_BUFFER]);
-                glBufferData(GL_ARRAY_BUFFER, sizeof(VertexData), VertexData, GL_STATIC_DRAW);
-
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, BO[INDEX_BUFFER]);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(IndexData), IndexData, GL_STATIC_DRAW);
-
-                glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), BUFFER_OFFSET(0));
-                glEnableVertexAttribArray(0);
-
                 Uint32 currentTime = 0;
                 Uint32 lastFrameTime = SDL_GetTicks();
                 while (Running)
@@ -130,7 +163,7 @@ main()
                     }
 
                     glClear(GL_COLOR_BUFFER_BIT);
-                    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                    Render(cubefloor);
                     SDL_GL_SwapWindow(Window);
 
                     currentTime = SDL_GetTicks();
