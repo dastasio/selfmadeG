@@ -13,10 +13,5 @@ struct debug_file
     GLchar *data;
 };
 
-internal inline void* Win32VirtualAlloc(SIZE_T size);
-internal inline bool Win32VirtualFree(void *p);
-internal debug_file Win32ReadFile(const char* filename);
-
-
 #define WIN32_SELFMADEX_H
 #endif

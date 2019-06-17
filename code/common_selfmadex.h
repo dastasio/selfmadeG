@@ -7,6 +7,8 @@
    $Notice: (C) Copyright 2019 by Dave Stasio. All Rights Reserved. $
    ======================================================================== */
 
+#include "selfmade_platform.h"
+
 #if SELFX_SLOW
 #define Assert(x) if(!x) {*(int *)0 = 0;}
 #else

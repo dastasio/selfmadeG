@@ -24,13 +24,12 @@
 #define WIDTH 1024
 #define HEIGHT 720
 
-#define internal static
-#define local_persist static
-#define global_variable static
-
 #include "win32_selfmadex.h"
 #include "common_selfmadex.h"
-#include "common_selfmadex.cpp"
+//#include "common_selfmadex.cpp"
+
+
+global_variable bool32 GlobalRunning = true;
 
 internal inline void*
 Win32VirtualAlloc(SIZE_T size)
@@ -56,6 +55,7 @@ Win32VirtualFree(void *p)
     return VirtualFree(p, 0, MEM_RELEASE);
 }
 
+#if 0
 // TODO(dave): Make this platform dependant and DON'T USE STREAMS!!
 internal debug_file
 Win32ReadFile(const char* filename)
@@ -84,6 +84,7 @@ Win32ReadFile(const char* filename)
 
     return File;
 }
+#endif
 
 inline void
 LogProgramLinking(GLuint p)
@@ -101,6 +102,80 @@ LogProgramLinking(GLuint p)
     }
 }
 
+LRESULT CALLBACK
+Win32MessagesCallback(HWND   Window,
+                      UINT   Message,
+                      WPARAM wParam,
+                      LPARAM lParam)
+{
+    switch(Message)
+    {
+        case WM_DESTROY:
+        case WM_CLOSE:
+        {
+            GlobalRunning = false;
+        }
+    }
+
+    return DefWindowProc(Window, Message, wParam, lParam);
+}
+
+#if 1
+int CALLBACK
+WinMain(
+    HINSTANCE Instance,
+    HINSTANCE PrevInstance,
+    LPSTR     CommandLine,
+    int       ShowCommand)
+{
+    WNDCLASS WindowClass = {};
+    WindowClass.style = CS_HREDRAW|CS_VREDRAW;
+    WindowClass.lpfnWndProc = Win32MessagesCallback;
+    WindowClass.hInstance = Instance;
+    WindowClass.lpszClassName = "SelfmadeWindowClass";
+
+    if(RegisterClass(&WindowClass))
+    {
+        HWND Window = CreateWindowEx(
+            0,
+            WindowClass.lpszClassName,
+            "SelfmadeX",
+            WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            0,
+            0,
+            Instance,
+            0);
+
+        if(Window)
+        {
+            while(GlobalRunning)
+            {
+                MSG Message;
+                while(PeekMessageA(&Message, 0, 0, 0, PM_REMOVE))
+                {
+                    if(Message.message == WM_QUIT)
+                    {
+                        GlobalRunning = false;
+                    }
+                    else
+                    {
+                        TranslateMessage(&Message);
+                        DispatchMessage(&Message);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // TODO(dave): Logging
+        }
+    }
+
+    return 0;
+}
+#else
 int
 main()
 {
@@ -127,7 +202,7 @@ main()
                 glViewport(0, 0, WIDTH, HEIGHT);
                 glClearColor(0.15f, 0.3f, 0.3f, 1);
                 
-                bool Running = true;
+                bool GlobalRunning = true;
 
                 GLuint Vshader = ReadAndCompileShader("shaders/vertex.glsl", GL_VERTEX_SHADER);
                 GLuint Fshader = ReadAndCompileShader("shaders/fragment.glsl", GL_FRAGMENT_SHADER);
@@ -142,13 +217,13 @@ main()
                 glDeleteShader(Vshader);
                 glDeleteShader(Fshader);
                 glDisable(GL_CULL_FACE);
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
                 mesh_data cubefloor = ImportOBJ("cubefloor.obj");
                 
                 Uint32 currentTime = 0;
                 Uint32 lastFrameTime = SDL_GetTicks();
-                while (Running)
+                while (GlobalRunning)
                 {
                     SDL_Event e;
                     if (SDL_PollEvent(&e))
@@ -156,7 +231,7 @@ main()
                         switch (e.type)
                         {
                             case SDL_QUIT:
-                                Running = false;
+                                GlobalRunning = false;
                                 break;
                             default: break;
                         }
@@ -189,3 +264,4 @@ main()
 
     return 0;
 }
+#endif
