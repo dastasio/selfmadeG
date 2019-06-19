@@ -38,6 +38,25 @@ typedef double real64;
 #define Gigabytes(Value) (Megabytes(Value)*1024LL)
 #define Terabytes(Value) (Gigabytes(Value)*1024LL)
 
+struct debug_file
+{
+    uint32  Length;
+    GLchar *Data;
+};
+
+#define SDL_PLATFORM_READ_ENTIRE_FILE(name) debug_file name(char *Filename)
+typedef SDL_PLATFORM_READ_ENTIRE_FILE(sdl_platform_read_entire_file);
+
+struct memory_block
+{
+    bool32 IsInitialized;
+
+    uint64 StorageSize;
+    void *Storage;
+
+    sdl_platform_read_entire_file *SDLPlatformReadEntireFile;
+};
+
 #ifdef __cplusplus
 }
 #endif

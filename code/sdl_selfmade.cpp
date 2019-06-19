@@ -55,8 +55,7 @@ Win32VirtualFree(void *p)
 }
 
 // TODO(dave): Make this platform dependant and DON'T USE STREAMS!!
-debug_file
-SDLReadEntireFile(char *Filename)
+SDL_PLATFORM_READ_ENTIRE_FILE(SDLReadEntireFile)
 {
     // TODO(dave): Use SDL i/o methods
     debug_file File = { };
@@ -65,12 +64,12 @@ SDLReadEntireFile(char *Filename)
     stream.open(Filename, std::ifstream::in | std::ifstream::ate);
     if (stream.is_open())
     {
-        File.length = (Uint32)stream.tellg();
-        if (File.length > 0)
+        File.Length = (Uint32)stream.tellg();
+        if (File.Length > 0)
         {
             stream.seekg(0);
-            File.data = (GLchar *) Win32VirtualAlloc(File.length * sizeof(GLchar));
-            stream.read(File.data, File.length);
+            File.Data = (GLchar *) Win32VirtualAlloc(File.Length * sizeof(GLchar));
+            stream.read(File.Data, File.Length);
             stream.close();
         }
         else ThrowErrorAndExit("Reading %s", Filename);
@@ -108,22 +107,12 @@ main()
             {
                 vec4 Vector = { 3, 5, 8, 7 };
 
-                //memory_block MainMemory = {};
-                //MainMemory.StorageSize = Megabytes(32);
-                //MainMemory.Storage = Win32VirtualAlloc(MainMemory.StorageSize, Terabytes(2));
+                memory_block MainMemory = {};
+                MainMemory.StorageSize = Megabytes(32);
+                MainMemory.Storage = Win32VirtualAlloc(MainMemory.StorageSize, (LPVOID)Terabytes(2));
+                MainMemory.SDLPlatformReadEntireFile = SDLReadEntireFile;
 
                 gladLoadGLLoader(SDL_GL_GetProcAddress);
-                glViewport(0, 0, WIDTH, HEIGHT);
-                glClearColor(0.15f, 0.3f, 0.3f, 1);
-                
-                GLuint Program = CompileShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
-
-                glUseProgram(Program);
-                //glDisable(GL_CULL_FACE);
-                //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-                debug_file RawOBJ = SDLReadEntireFile("cube.obj");
-                mesh_data cubefloor = ImportOBJ(RawOBJ);
                 
                 Uint32 currentTime = 0;
                 Uint32 lastFrameTime = SDL_GetTicks();
@@ -142,7 +131,7 @@ main()
                     }
 
                     glClear(GL_COLOR_BUFFER_BIT);
-                    Render(cubefloor);
+                    Render(&MainMemory);
                     SDL_GL_SwapWindow(Window);
 
                     currentTime = SDL_GetTicks();

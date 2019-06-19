@@ -15,7 +15,7 @@ Max(long a, long b)
 }
 
 internal mesh_data
-ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
+ImportOBJ(debug_file *RawObj, memory_pool *Pool, GLuint vao = 0)
 {
     mesh_data Mesh = { };
 
@@ -24,7 +24,7 @@ ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
     Uint32 vnCount = 0;
     Uint32 fCount = 0;
     // TODO(dave): Optimize into one loop
-    for (GLchar *c = RawOBJ.data; (c - RawOBJ.data) < RawOBJ.length;)
+    for (char *c = RawObj->Data; (c - RawObj->Data) < RawObj->Length;)
     {
         switch (*c++)
         {
@@ -48,11 +48,13 @@ ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
     vtCount *= 2;
     vnCount *= 3;
     fCount *= 9;
-    GLfloat *v  = (GLfloat *) Win32VirtualAlloc(vCount * sizeof(GLfloat));
-    GLfloat *vt = (GLfloat *) Win32VirtualAlloc((vtCount ? vtCount : 1) * sizeof(GLfloat));
-    GLfloat *vn = (GLfloat *) Win32VirtualAlloc((vnCount ? vnCount : 1) * sizeof(GLfloat));
-    GLuint  *f  = (GLuint  *) Win32VirtualAlloc(fCount * sizeof(GLuint));
-    for (GLchar *c = RawOBJ.data; (c - RawOBJ.data) < RawOBJ.length;)
+    
+    uint8 *PoolIndexBeforeAllocations = Pool->Base + Pool->Used;
+    GLfloat *v  = PushArray(Pool, vCount, GLfloat); //(GLfloat *) Win32VirtualAlloc(vCount * sizeof(GLfloat));
+    GLfloat *vt = PushArray(Pool, (vtCount ? vtCount : 1), GLfloat); //(GLfloat *) Win32VirtualAlloc((vtCount ? vtCount : 1) * sizeof(GLfloat));
+    GLfloat *vn = PushArray(Pool, (vnCount ? vnCount : 1), GLfloat); //(GLfloat *) Win32VirtualAlloc((vnCount ? vnCount : 1) * sizeof(GLfloat));
+    GLuint  *f  = PushArray(Pool, fCount, GLuint); //(GLuint  *) Win32VirtualAlloc(fCount * sizeof(GLuint));
+    for (GLchar *c = RawObj->Data; (c - RawObj->Data) < RawObj->Length;)
     {
         switch (*c++)
         {
@@ -95,43 +97,43 @@ ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
     //if (!vtCount) { *vt = 0; *(vt+1) = 0; }
     //if (!vnCount) { *vn = 0; *(vn+1) = 0; *(vn+2) = 0; }
 
-    Uint32 lastIndex = 0;
-    Mesh.vertices = (GLfloat *) Win32VirtualAlloc(fCount * sizeof(GLfloat) * 8);
-    Mesh.indices  = (GLuint  *) Win32VirtualAlloc(fCount * sizeof(GLfloat) / 3);
+    uint32 LastIndex = 0;
+    GLfloat *Vertices = PushArray(Pool, fCount*8, GLfloat); //(GLfloat *) Win32VirtualAlloc(fCount * sizeof(GLfloat) * 8);
+    GLuint *Indices  = PushArray(Pool, fCount/3, GLuint); //(GLuint  *) Win32VirtualAlloc(fCount * sizeof(GLfloat) / 3);
     for (GLuint *i = f; (i - f) < fCount; i += 3)
     {
         GLuint *k = f;
         while (!((*k == *i) && (*(k+1) == *(i+1)) && (*(k+2) == *(i+2)))) {k += 3;}
         if (k == i)
         {
-            *(Mesh.indices + Mesh.nIndices++) = lastIndex++;
+            *(Indices + Mesh.nIndices++) = LastIndex++;
 
             Uint32 vOff  = (*(i) - 1) * 3;
             Uint32 vtOff = Max((*(i+1) - 1) * 2, 0);
             Uint32 vnOff = Max((*(i+2) - 1) * 3, 0);
             
-            *(Mesh.vertices + Mesh.nVertices++) = *(v+vOff);
-            *(Mesh.vertices + Mesh.nVertices++) = *(v+vOff+1);
-            *(Mesh.vertices + Mesh.nVertices++) = *(v+vOff+2);
+            *(Vertices + Mesh.nVertices++) = *(v+vOff);
+            *(Vertices + Mesh.nVertices++) = *(v+vOff+1);
+            *(Vertices + Mesh.nVertices++) = *(v+vOff+2);
             
-            *(Mesh.vertices + Mesh.nVertices++) = *(vn+vnOff);
-            *(Mesh.vertices + Mesh.nVertices++) = *(vn+vnOff+1);
-            *(Mesh.vertices + Mesh.nVertices++) = *(vn+vnOff+2);
+            *(Vertices + Mesh.nVertices++) = *(vn+vnOff);
+            *(Vertices + Mesh.nVertices++) = *(vn+vnOff+1);
+            *(Vertices + Mesh.nVertices++) = *(vn+vnOff+2);
             
-            *(Mesh.vertices + Mesh.nVertices++) = *(vt+vtOff);
-            *(Mesh.vertices + Mesh.nVertices++) = *(vt+vtOff+1);
+            *(Vertices + Mesh.nVertices++) = *(vt+vtOff);
+            *(Vertices + Mesh.nVertices++) = *(vt+vtOff+1);
         }
         else
         {
-            *(Mesh.indices + Mesh.nIndices++) = (GLuint) (k - f) / 3;
+            *(Indices + Mesh.nIndices++) = (GLuint) (k - f) / 3;
         }
         
     }
 
-    Win32VirtualFree(vt);
-    Win32VirtualFree(vn);
-    Win32VirtualFree(f);
-    Win32VirtualFree(RawOBJ.data);
+//    Win32VirtualFree(vt);
+//    Win32VirtualFree(vn);
+//    Win32VirtualFree(f);
+//    Win32VirtualFree(RawObj->Data);
 
     if (vao == 0)
     {
@@ -142,10 +144,10 @@ ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
     
     glGenBuffers(2, Mesh.bo);
     glBindBuffer(GL_ARRAY_BUFFER, Mesh.bo[VERTEX_BUFFER]);
-    glBufferData(GL_ARRAY_BUFFER, Mesh.nVertices * sizeof(GLfloat), Mesh.vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, Mesh.nVertices * sizeof(GLfloat), Vertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Mesh.bo[INDEX_BUFFER]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, Mesh.nIndices * sizeof(GLuint), Mesh.indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, Mesh.nIndices * sizeof(GLuint), Indices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), BUFFER_OFFSET(0));
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), BUFFER_OFFSET(3 * sizeof(GLfloat)));
@@ -154,19 +156,18 @@ ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
 
-    Win32VirtualFree(Mesh.vertices);
-    Win32VirtualFree(Mesh.indices);
+    PopMemoryPoolToIndex(Pool, PoolIndexBeforeAllocations);
+//    Win32VirtualFree(Mesh.vertices);
+//    Win32VirtualFree(Mesh.indices);
     return Mesh;
 }
 
 internal GLuint
-CompileShader(char *path, GLenum type)
+CompileShader(debug_file *Source, char *Path, GLenum type)
 {
-    debug_file Source = SDLReadEntireFile(path);
-
     GLuint Shader = glCreateShader(type);
-    glShaderSource(Shader, 1, &Source.data, (GLint*) &Source.length);
-    Win32VirtualFree(Source.data);
+    glShaderSource(Shader, 1, &Source->Data, (GLint*) &Source->Length);
+    Win32VirtualFree(Source->Data);
     glCompileShader(Shader);
 
     int Compiled;
@@ -178,18 +179,21 @@ CompileShader(char *path, GLenum type)
         GLchar *Log = new GLchar[LogSize];
         glGetShaderInfoLog(Shader, LogSize, 0, Log);
 
-        ThrowErrorAndExit("Shader '%s' could not be compiled:\n%s", path, Log);
+        ThrowErrorAndExit("Shader '%s' could not be compiled:\n%s", Path, Log);
     }
 
     return Shader;
 }
 
 internal GLuint
-CompileShaderProgram(char *VertexPath, char *FragmentPath)
+CompileShaderProgram(sdl_platform_read_entire_file SDLPlatformReadEntireFile,
+                     char *VertexPath, char *FragmentPath)
 {
     GLuint Program;
-    GLuint VShader = CompileShader(VertexPath, GL_VERTEX_SHADER);
-    GLuint FShader = CompileShader(FragmentPath, GL_FRAGMENT_SHADER);
+    debug_file VertexSource = SDLPlatformReadEntireFile(VertexPath);
+    debug_file FragmentSource = SDLPlatformReadEntireFile(FragmentPath);
+    GLuint VShader = CompileShader(&VertexSource, VertexPath, GL_VERTEX_SHADER);
+    GLuint FShader = CompileShader(&FragmentSource, FragmentPath, GL_FRAGMENT_SHADER);
 
     Program = glCreateProgram();
     glAttachShader(Program, VShader);
@@ -226,49 +230,59 @@ InitializeMemory(memory_block Memory)
 }
 #endif
 internal void
-Render(mesh_data m)
+Render(memory_block *Memory)
 {
+    Assert((sizeof(game_state) <= Memory->StorageSize));
+    game_state *State = (game_state *)Memory->Storage;
+    if(!Memory->IsInitialized)
+    {
+        InitializeMemoryPool(&State->MemoryPool,
+                             (uint8 *)Memory->Storage + sizeof(game_state),
+                             Memory->StorageSize - sizeof(game_state));
+
+        State->ShadingProgram = CompileShaderProgram(Memory->SDLPlatformReadEntireFile,
+                                                     "shaders/vertex.glsl",
+                                                     "shaders/fragment.glsl");
+        debug_file Obj = Memory->SDLPlatformReadEntireFile("cube.obj");
+        State->Mesh = ImportOBJ(&Obj, &State->MemoryPool);
+        State->Camera.Position = {0.f, 0.f, -0.5f};
+        State->Camera.Target = {};
+        State->Camera.Up = {0.f, 1.f, 0.f};
+
+        glUseProgram(State->ShadingProgram);
+        //glDisable(GL_CULL_FACE);
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glViewport(0, 0, WIDTH, HEIGHT);
+        glClearColor(0.15f, 0.3f, 0.3f, 1);
+
+        Memory->IsInitialized = true;
+    }
     const uint8 *KeyboardState = SDL_GetKeyboardState(0);
-    local_persist vec3 Camera = {0.f, 0.f, 0.f};
     if(KeyboardState[SDL_SCANCODE_W])
     {
-        Camera.z += 0.05f;
+        State->Camera.Position.z += 0.05f;
     }
     if (KeyboardState[SDL_SCANCODE_A])
     {
-        Camera.x -= 0.05f;
+        State->Camera.Position.x -= 0.05f;
     }
     if (KeyboardState[SDL_SCANCODE_S])
     {
-        Camera.z -= 0.05f;
+        State->Camera.Position.z -= 0.05f;
     }
     if (KeyboardState[SDL_SCANCODE_D])
     {
-        Camera.x += 0.05f;
+        State->Camera.Position.x += 0.05f;
     }
-//    if (KeyboardState[SDL_SCANCODE_LALT])
-//    {
-//        glUniform1f(3, 0.5f);
-//    }
-//    else if (KeyboardState[SDL_SCANCODE_RALT])
-//    {
-//        glUniform1f(3, 1.f);
-//    }
-//    else
-//    {
-//        glUniform1f(3, 0.f);
-//    }
 
-    //local_persist real32 angle = 0.f;
-    //mat3 R = RotationMatrix3({0.f, 1.f, 0.f}, angle);
-    //angle += 0.05f;
-
-    mat4 CameraMatrix = CameraSpaceMatrix(Camera, {0.f, 0.f, 0.f}, {0.f, 1.f, 0.f});
+    mat4 CameraMatrix = CameraSpaceMatrix(State->Camera.Position,
+                                          State->Camera.Target,
+                                          State->Camera.Up);
     mat4 PerspectiveMatrix = PerspectiveProjection(90.f, 1024.f/720.f, 0.1f, 100.f);
     vec3 test = UnitVectorFromVector3({1.f, 1.f, 0.f});
 
     mat4 TransformationMatrix = PerspectiveMatrix * CameraMatrix;
     glUniformMatrix4fv(0, 1, false, &TransformationMatrix[0][0]);
-    glBindVertexArray(m.vao);
-    glDrawElements(GL_TRIANGLES, m.nIndices, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(State->Mesh.vao);
+    glDrawElements(GL_TRIANGLES, State->Mesh.nIndices, GL_UNSIGNED_INT, 0);
 }
