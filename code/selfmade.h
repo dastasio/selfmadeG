@@ -8,6 +8,7 @@
    ======================================================================== */
 
 #include "selfmade_platform.h"
+#include "selfmade_math.h"
 
 #if SELFX_SLOW
 #define Assert(x) if(!x) {*(int *)0 = 0;}
@@ -17,11 +18,21 @@
 
 #if SELFX_INTERNAL
 #define ThrowErrorAndExit(error, ...) { printf("[ERROR]" ## error, __VA_ARGS__); std::cin.ignore(); exit(EXIT_FAILURE); }
+#define ThrowError(error, ...) { printf("[ERROR]" ## error, __VA_ARGS__); }
 #else
 #define ThrowErrorAndExit(error, ...)
+#define ThrowError(error, ...)
 #endif
 
 #define BUFFER_OFFSET(x) ( (void *) 0)
+
+struct memory_block
+{
+    bool32 IsInitialized;
+
+    uint64 StorageSize;
+    void *Storage;
+};
 
 struct mesh_data
 {
@@ -35,8 +46,8 @@ struct mesh_data
 
 struct shader_source
 {
-    Uint32  length;
-    GLchar *data;
+    uint32  length;
+    GLbyte *data;
 };
 
 

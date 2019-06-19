@@ -33,6 +33,11 @@ typedef size_t memory_index;
 typedef float real32;
 typedef double real64;
 
+#define Kilobytes(Value) ((Value)*1024LL)
+#define Megabytes(Value) (Kilobytes(Value)*1024LL)
+#define Gigabytes(Value) (Megabytes(Value)*1024LL)
+#define Terabytes(Value) (Gigabytes(Value)*1024LL)
+
 #ifdef __cplusplus
 }
 #endif

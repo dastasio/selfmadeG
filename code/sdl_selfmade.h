@@ -9,9 +9,13 @@
 
 struct debug_file
 {
-    Uint32  length;
+    uint32  length;
     GLchar *data;
 };
+
+void *Win32VirtualAlloc(SIZE_T size, LPVOID BaseAddress = 0);
+bool Win32VirtualFree(void *p);
+debug_file SDLReadEntireFile(char *Filename);
 
 #define WIN32_SELFMADEX_H
 #endif

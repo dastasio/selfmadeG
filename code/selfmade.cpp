@@ -6,7 +6,7 @@
    $Notice: (C) Copyright 2019 by Dave Stasio. All Rights Reserved. $
    ======================================================================== */
 
-#include "common_selfmadex.h"
+#include "selfmade.h"
 
 internal inline long
 Max(long a, long b)
@@ -15,10 +15,9 @@ Max(long a, long b)
 }
 
 internal mesh_data
-ImportOBJ(const char* path, GLuint vao = 0)
+ImportOBJ(debug_file RawOBJ, GLuint vao = 0)
 {
     mesh_data Mesh = { };
-    debug_file RawOBJ = Win32ReadFile(path);
 
     Uint32 vCount = 0;
     Uint32 vtCount = 0;
@@ -161,34 +160,115 @@ ImportOBJ(const char* path, GLuint vao = 0)
 }
 
 internal GLuint
-ReadAndCompileShader(const char* path, GLenum type)
+CompileShader(char *path, GLenum type)
 {
-    debug_file Source = Win32ReadFile(path);
-    
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &Source.data, (GLint*) &Source.length);
+    debug_file Source = SDLReadEntireFile(path);
+
+    GLuint Shader = glCreateShader(type);
+    glShaderSource(Shader, 1, &Source.data, (GLint*) &Source.length);
     Win32VirtualFree(Source.data);
-    glCompileShader(shader);
+    glCompileShader(Shader);
 
     int Compiled;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &Compiled);
+    glGetShaderiv(Shader, GL_COMPILE_STATUS, &Compiled);
     if (!Compiled)
     {
         int LogSize;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &LogSize);
+        glGetShaderiv(Shader, GL_INFO_LOG_LENGTH, &LogSize);
         GLchar *Log = new GLchar[LogSize];
-        glGetShaderInfoLog(shader, LogSize, 0, Log);
+        glGetShaderInfoLog(Shader, LogSize, 0, Log);
 
         ThrowErrorAndExit("Shader '%s' could not be compiled:\n%s", path, Log);
     }
 
-    return shader;
+    return Shader;
 }
 
+internal GLuint
+CompileShaderProgram(char *VertexPath, char *FragmentPath)
+{
+    GLuint Program;
+    GLuint VShader = CompileShader(VertexPath, GL_VERTEX_SHADER);
+    GLuint FShader = CompileShader(FragmentPath, GL_FRAGMENT_SHADER);
 
+    Program = glCreateProgram();
+    glAttachShader(Program, VShader);
+    glAttachShader(Program, FShader);
+    glLinkProgram(Program);
+    glDeleteShader(VShader);
+    glDeleteShader(FShader);
+
+    int Success;
+    glGetProgramiv(Program, GL_LINK_STATUS, &Success);
+    if (!Success)
+    {
+        int LogSize;
+        glGetProgramiv(Program, GL_INFO_LOG_LENGTH, &LogSize);
+        GLchar *Log = new GLchar[LogSize];
+        glGetProgramInfoLog(Program, LogSize, 0, Log);
+
+        ThrowErrorAndExit("Unable to link shader program:\n%s", Log);
+    }
+
+    return Program;
+}
+#if 0
+struct initialization_memory
+{
+    debug_file VertexShader;
+    debug_file FragmentShader;
+
+};
+
+internal void
+InitializeMemory(memory_block Memory)
+{
+}
+#endif
 internal void
 Render(mesh_data m)
 {
+    const uint8 *KeyboardState = SDL_GetKeyboardState(0);
+    local_persist vec3 Camera = {0.f, 0.f, 0.f};
+    if(KeyboardState[SDL_SCANCODE_W])
+    {
+        Camera.z += 0.05f;
+    }
+    if (KeyboardState[SDL_SCANCODE_A])
+    {
+        Camera.x -= 0.05f;
+    }
+    if (KeyboardState[SDL_SCANCODE_S])
+    {
+        Camera.z -= 0.05f;
+    }
+    if (KeyboardState[SDL_SCANCODE_D])
+    {
+        Camera.x += 0.05f;
+    }
+//    if (KeyboardState[SDL_SCANCODE_LALT])
+//    {
+//        glUniform1f(3, 0.5f);
+//    }
+//    else if (KeyboardState[SDL_SCANCODE_RALT])
+//    {
+//        glUniform1f(3, 1.f);
+//    }
+//    else
+//    {
+//        glUniform1f(3, 0.f);
+//    }
+
+    //local_persist real32 angle = 0.f;
+    //mat3 R = RotationMatrix3({0.f, 1.f, 0.f}, angle);
+    //angle += 0.05f;
+
+    mat4 CameraMatrix = CameraSpaceMatrix(Camera, {0.f, 0.f, 0.f}, {0.f, 1.f, 0.f});
+    mat4 PerspectiveMatrix = PerspectiveProjection(90.f, 1024.f/720.f, 0.1f, 100.f);
+    vec3 test = UnitVectorFromVector3({1.f, 1.f, 0.f});
+
+    mat4 TransformationMatrix = PerspectiveMatrix * CameraMatrix;
+    glUniformMatrix4fv(0, 1, false, &TransformationMatrix[0][0]);
     glBindVertexArray(m.vao);
     glDrawElements(GL_TRIANGLES, m.nIndices, GL_UNSIGNED_INT, 0);
 }
