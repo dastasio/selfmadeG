@@ -82,6 +82,12 @@ typedef struct vec3
         return Result;
     }
 
+    vec3 operator*(real32 m)
+    {
+        vec3 Result = {x*m, y*m, z*m};
+        return Result;
+    }
+
     vec3 operator/(real32 d)
     {
         vec3 Result = {x, y, z};
@@ -89,6 +95,20 @@ typedef struct vec3
         Result.y /= d;
         Result.z /= d;
         return Result;
+    }
+
+    void operator+=(vec3 b)
+    {
+        x += b.x;
+        y += b.y;
+        z += b.z;
+    }
+
+    void operator-=(vec3 b)
+    {
+        x -= b.x;
+        y -= b.y;
+        z -= b.z;
     }
 
     void operator/=(real32 d)
@@ -103,6 +123,11 @@ typedef struct vec3
         return *((GLfloat *)this + i);
     }
 } vec3;
+vec3 operator*(real32 a, vec3 b)
+{
+    vec3 Result = {a*b.x, a*b.y, a*b.z};
+    return Result;
+}
 
 typedef struct vec4
 {
@@ -164,6 +189,15 @@ typedef struct mat4
         return *((vec4 *)this + i);
     }
 } mat4;
+
+struct camera_space
+{
+    vec3 U;
+    vec3 V;
+    vec3 N;
+
+    mat4 Matrix;
+};
 
 real32
 VectorLength(vec3 Vector)
@@ -384,12 +418,16 @@ PerspectiveProjection(real32 FOV, real32 AR, real32 NearZ, real32 FarZ)
 }
 
 inline mat4
-CameraSpaceMatrix(vec3 Position, vec3 Target, vec3 Up)
+ComputeCameraSpace(camera_space *CameraSpace,
+                   vec3 NewPosition, vec3 NewTarget, vec3 NewUp)
 {
-    vec3 N = UnitVectorFromVector3(Target - Position);
-    vec3 U = UnitVectorFromVector3(Up);
-    vec3 V = CrossProduct(-N, U);
+    CameraSpace->N = UnitVectorFromVector3(NewTarget - NewPosition);
+    CameraSpace->U = UnitVectorFromVector3(NewUp);
+    CameraSpace->V = CrossProduct(-CameraSpace->N, CameraSpace->U);
 
+    vec3 &U = CameraSpace->U;
+    vec3 &V = CameraSpace->V;
+    vec3 &N = CameraSpace->N;
     mat4 Result = {
         { V.x, U.x, N.x, 0.f },
         { V.y, U.y, N.y, 0.f },
@@ -397,6 +435,6 @@ CameraSpaceMatrix(vec3 Position, vec3 Target, vec3 Up)
         { 0.f, 0.f, 0.f, 1.f }
     };
 
-    Result *= TranslationMatrix4(-Position);
+    Result *= TranslationMatrix4(-NewPosition);
     return Result;
 }

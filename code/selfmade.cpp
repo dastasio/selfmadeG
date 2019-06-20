@@ -125,7 +125,7 @@ ImportOBJ(debug_file *RawObj, memory_pool *Pool, GLuint vao = 0)
         }
         else
         {
-            *(Indices + Mesh.nIndices++) = (GLuint) (k - f) / 3;
+            *(Indices + Mesh.nIndices++) = *(Indices + Mesh.nIndices - ((i-k)/3) );
         }
         
     }
@@ -243,46 +243,61 @@ Render(memory_block *Memory)
         State->ShadingProgram = CompileShaderProgram(Memory->SDLPlatformReadEntireFile,
                                                      "shaders/vertex.glsl",
                                                      "shaders/fragment.glsl");
-        debug_file Obj = Memory->SDLPlatformReadEntireFile("cube.obj");
+        debug_file Obj = Memory->SDLPlatformReadEntireFile("scene.obj");
         State->Mesh = ImportOBJ(&Obj, &State->MemoryPool);
         State->Camera.Position = {0.f, 0.f, -0.5f};
         State->Camera.Target = {};
         State->Camera.Up = {0.f, 1.f, 0.f};
 
         glUseProgram(State->ShadingProgram);
-        //glDisable(GL_CULL_FACE);
+        glDisable(GL_CULL_FACE);
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glEnable(GL_DEPTH_TEST);
         glViewport(0, 0, WIDTH, HEIGHT);
         glClearColor(0.15f, 0.3f, 0.3f, 1);
 
         Memory->IsInitialized = true;
     }
+    camera_data *Cam = &State->Camera;
     const uint8 *KeyboardState = SDL_GetKeyboardState(0);
     if(KeyboardState[SDL_SCANCODE_W])
     {
-        State->Camera.Position.z += 0.05f;
+        Cam->Position += 0.05f*Cam->Space.N;
     }
     if (KeyboardState[SDL_SCANCODE_A])
     {
-        State->Camera.Position.x -= 0.05f;
+        Cam->Position -= 0.05f*Cam->Space.V;
     }
     if (KeyboardState[SDL_SCANCODE_S])
     {
-        State->Camera.Position.z -= 0.05f;
+        Cam->Position -= 0.05f*Cam->Space.N;
     }
     if (KeyboardState[SDL_SCANCODE_D])
     {
-        State->Camera.Position.x += 0.05f;
+        Cam->Position += 0.05f*Cam->Space.V;
+    }
+    if (KeyboardState[SDL_SCANCODE_LSHIFT])
+    {
+        Cam->Target += 0.05f*Cam->Space.U;
+        Cam->Position += 0.05f*Cam->Space.U;
+    }
+    if (KeyboardState[SDL_SCANCODE_LCTRL])
+    {
+        Cam->Target -= 0.05f*Cam->Space.U;
+        Cam->Position -= 0.05f*Cam->Space.U;
     }
 
-    mat4 CameraMatrix = CameraSpaceMatrix(State->Camera.Position,
-                                          State->Camera.Target,
-                                          State->Camera.Up);
+    mat4 CameraMatrix = ComputeCameraSpace(&State->Camera.Space,
+                                           State->Camera.Position,
+                                           State->Camera.Target,
+                                           State->Camera.Up);
     mat4 PerspectiveMatrix = PerspectiveProjection(90.f, 1024.f/720.f, 0.1f, 100.f);
     vec3 test = UnitVectorFromVector3({1.f, 1.f, 0.f});
 
     mat4 TransformationMatrix = PerspectiveMatrix * CameraMatrix;
     glUniformMatrix4fv(0, 1, false, &TransformationMatrix[0][0]);
+    glUniform3f(1, Cam->Position.x, Cam->Position.y, Cam->Position.z);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glBindVertexArray(State->Mesh.vao);
     glDrawElements(GL_TRIANGLES, State->Mesh.nIndices, GL_UNSIGNED_INT, 0);
 }

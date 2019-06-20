@@ -78,6 +78,8 @@ struct camera_data
     vec3 Position;
     vec3 Target;
     vec3 Up;
+
+    camera_space Space;
 };
 
 struct game_state

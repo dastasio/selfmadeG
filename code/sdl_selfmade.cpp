@@ -130,7 +130,6 @@ main()
                         }
                     }
 
-                    glClear(GL_COLOR_BUFFER_BIT);
                     Render(&MainMemory);
                     SDL_GL_SwapWindow(Window);
 
