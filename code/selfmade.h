@@ -24,7 +24,7 @@
 #define ThrowError(error, ...)
 #endif
 
-#define BUFFER_OFFSET(x) ( (void *) 0)
+#define BUFFER_OFFSET(x) ((void *)(x)) 
 
 struct memory_pool
 {
@@ -71,6 +71,16 @@ struct mesh_data
     GLuint   nVertices;
     GLuint   vao;
     GLuint   bo[2];
+
+    vec3 Scale;
+    vec3 Rotation;
+    vec3 Position;
+};
+
+struct light_data
+{
+    mesh_data Mesh;
+    vec3 Color;
 };
 
 struct camera_data
@@ -85,7 +95,10 @@ struct camera_data
 struct game_state
 {
     uint32 ShadingProgram;
-    mesh_data Mesh;
+    uint32 LightProgram;
+    mesh_data Scene;
+    mesh_data Player;
+    light_data MainLight;
     camera_data Camera;
 
     memory_pool MemoryPool;

@@ -211,7 +211,7 @@ VectorLength(vec3 Vector)
 };
 
 vec3
-UnitVectorFromVector3(vec3 Vector)
+Normalize(vec3 Vector)
 {
     vec3 &Result = Vector;
     real32 Length = VectorLength(Vector);
@@ -421,9 +421,9 @@ inline mat4
 ComputeCameraSpace(camera_space *CameraSpace,
                    vec3 NewPosition, vec3 NewTarget, vec3 NewUp)
 {
-    CameraSpace->N = UnitVectorFromVector3(NewTarget - NewPosition);
-    CameraSpace->U = UnitVectorFromVector3(NewUp);
-    CameraSpace->V = CrossProduct(-CameraSpace->N, CameraSpace->U);
+    CameraSpace->N = Normalize(NewTarget - NewPosition);
+    CameraSpace->V = Normalize(CrossProduct(CameraSpace->N, NewUp));
+    CameraSpace->U = Normalize(CrossProduct(CameraSpace->V, CameraSpace->N));
 
     vec3 &U = CameraSpace->U;
     vec3 &V = CameraSpace->V;
