@@ -129,6 +129,10 @@ main()
                             default: break;
                         }
                     }
+                    if (SDL_GetKeyboardState(0)[SDL_SCANCODE_ESCAPE])
+                    {
+                        GlobalRunning = false;
+                    }
 
                     Render(&MainMemory);
                     SDL_GL_SwapWindow(Window);

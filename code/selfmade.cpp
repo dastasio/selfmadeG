@@ -7,6 +7,8 @@
    ======================================================================== */
 
 #include "selfmade.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 internal inline long
 Max(long a, long b)
@@ -234,6 +236,7 @@ Render(memory_block *Memory)
 {
     Assert((sizeof(game_state) <= Memory->StorageSize));
     game_state *State = (game_state *)Memory->Storage;
+    local_persist GLuint Texture;
     if(!Memory->IsInitialized)
     {
         InitializeMemoryPool(&State->MemoryPool,
@@ -258,11 +261,28 @@ Render(memory_block *Memory)
         State->Camera.Target = {0.f, 4.2f, 0.f};
         State->Camera.Up = {0.f, 1.f, 0.f};
 
-        glDisable(GL_CULL_FACE);
+        //glDisable(GL_CULL_FACE);
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glEnable(GL_DEPTH_TEST);
         glViewport(0, 0, WIDTH, HEIGHT);
         glClearColor(0.15f, 0.3f, 0.3f, 1);
+        glUseProgram(State->ShadingProgram);
+
+        int32 ImageWidth, ImageHeight, ImageChannels;
+        uint8 *ImageData = stbi_load("container.jpg", &ImageWidth, &ImageHeight, &ImageChannels, 0);
+        glGenTextures(1, &Texture);
+        glBindTexture(GL_TEXTURE_2D, Texture);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                     ImageWidth, ImageHeight, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, ImageData);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        stbi_image_free(ImageData);
 
         Memory->IsInitialized = true;
     }
@@ -344,6 +364,7 @@ Render(memory_block *Memory)
     mat4 PerspectiveMatrix = PerspectiveProjection(90.f, 1024.f/720.f, 0.1f, 100.f);
 
     glUseProgram(State->ShadingProgram);
+    glBindTexture(GL_TEXTURE_2D, Texture);
     mat4 ScreenSpaceTransform = PerspectiveMatrix * CameraMatrix;
     glUniformMatrix4fv(0, 1, false, &ScreenSpaceTransform[0][0]);
     glUniform3fv(1, 1, &Cam->Position[0]);
