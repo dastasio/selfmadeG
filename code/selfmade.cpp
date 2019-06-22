@@ -231,12 +231,35 @@ InitializeMemory(memory_block Memory)
 {
 }
 #endif
+inline void
+ColliderFromExtremes(collider *Collider, vec3 Min, vec3 Max)
+{
+    Assert(((Min.x < Max.x) && (Min.y < Max.y) && (Min.z < Max.z)));
+    Collider->Center = (Min + Max) / 2.f;
+    Collider->Radius = {
+        Collider->Center.x - Min.x,
+        Collider->Center.y - Min.y,
+        Collider->Center.z - Min.z
+    };
+}
+
+internal bool
+CheckCollision(mesh_data Mesh1, mesh_data Mesh2)
+{
+    vec3 Center1 = Mesh1.Colliders[0].Center + Mesh1.Position;
+    vec3 Center2 = Mesh2.Colliders[0].Center + Mesh2.Position;
+    vec3 Distance = Absolute(Center1 - Center2);
+    bool Result = ((Distance.x <= (Mesh1.Colliders[0].Radius.x + Mesh2.Colliders[0].Radius.x)) &&
+                   (Distance.y <= (Mesh1.Colliders[0].Radius.y + Mesh2.Colliders[0].Radius.y)) &&
+                   (Distance.z <= (Mesh1.Colliders[0].Radius.z + Mesh2.Colliders[0].Radius.z)));
+    return Result;
+}
+
 internal void
 Render(memory_block *Memory)
 {
     Assert((sizeof(game_state) <= Memory->StorageSize));
     game_state *State = (game_state *)Memory->Storage;
-    local_persist GLuint Texture;
     if(!Memory->IsInitialized)
     {
         InitializeMemoryPool(&State->MemoryPool,
@@ -254,11 +277,21 @@ Render(memory_block *Memory)
         debug_file LightObj = Memory->SDLPlatformReadEntireFile("light.obj");
         State->Scene = ImportOBJ(&SceneObj, &State->MemoryPool);
         State->Player = ImportOBJ(&PlayerObj, &State->MemoryPool);
+
+        State->Scene.nColliders = 1;
+        State->Scene.Colliders = PushArray(&State->MemoryPool, State->Scene.nColliders, collider);
+        State->Scene.Colliders[0].Center = {-30.1332f, 0.635283f, -29.2653f};
+        State->Scene.Colliders[0].Radius = {6.5669f, 0.635283f, 7.303f};
+        State->Player.nColliders = 1;
+        State->Player.Colliders = PushArray(&State->MemoryPool, State->Player.nColliders, collider);
+        State->Player.Colliders[0].Center = {0.000000f, 0.999445f, 0.000000f};
+        State->Player.Colliders[0].Radius = {0.323305f, 0.999445f, 0.313644f};
+
         State->MainLight.Mesh = ImportOBJ(&LightObj, &State->MemoryPool);
-        State->MainLight.Mesh.Position = {0.f, 6.f, 0.f};
+        State->MainLight.Mesh.Position = {0.f, 25.f, 0.f};
         State->MainLight.Color = {1.f, 1.f, 1.f};
-        State->Camera.Position = {0.f, 4.2f, -3.f};
-        State->Camera.Target = {0.f, 4.2f, 0.f};
+        State->Camera.Position = {0.f, 1.f, -3.f};
+        State->Camera.Target = {0.f, 1.7f, 0.f};
         State->Camera.Up = {0.f, 1.f, 0.f};
 
         //glDisable(GL_CULL_FACE);
@@ -268,21 +301,21 @@ Render(memory_block *Memory)
         glClearColor(0.15f, 0.3f, 0.3f, 1);
         glUseProgram(State->ShadingProgram);
 
-        int32 ImageWidth, ImageHeight, ImageChannels;
-        uint8 *ImageData = stbi_load("container.jpg", &ImageWidth, &ImageHeight, &ImageChannels, 0);
-        glGenTextures(1, &Texture);
-        glBindTexture(GL_TEXTURE_2D, Texture);
+        //int32 ImageWidth, ImageHeight, ImageChannels;
+        //uint8 *ImageData = stbi_load("container.jpg", &ImageWidth, &ImageHeight, &ImageChannels, 0);
+        //glGenTextures(1, &Texture);
+        //glBindTexture(GL_TEXTURE_2D, Texture);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                     ImageWidth, ImageHeight, 0,
-                     GL_RGB, GL_UNSIGNED_BYTE, ImageData);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        stbi_image_free(ImageData);
+        //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+        //             ImageWidth, ImageHeight, 0,
+        //             GL_RGB, GL_UNSIGNED_BYTE, ImageData);
+        //glGenerateMipmap(GL_TEXTURE_2D);
+        //stbi_image_free(ImageData);
 
         Memory->IsInitialized = true;
     }
@@ -324,29 +357,57 @@ Render(memory_block *Memory)
     {
         vec3 MoveVector = {Cam->Space.N.x, 0.f, Cam->Space.N.z};
         State->Player.Position += 0.3f*MoveVector;
-        Cam->Position += 0.3f*MoveVector;
-        Cam->Target += 0.3f*MoveVector;
+        if(CheckCollision(State->Player, State->Scene))
+        {
+            State->Player.Position -= 0.3f*MoveVector;
+        }
+        else
+        {
+            Cam->Position += 0.3f*MoveVector;
+            Cam->Target += 0.3f*MoveVector;
+        }
     }
     if (KeyboardState[SDL_SCANCODE_S])
     {
         vec3 MoveVector = {Cam->Space.N.x, 0.f, Cam->Space.N.z};
         State->Player.Position -= 0.3f*MoveVector;
-        Cam->Position -= 0.3f*MoveVector;
-        Cam->Target -= 0.3f*MoveVector;
+        if(CheckCollision(State->Player, State->Scene))
+        {
+            State->Player.Position += 0.3f*MoveVector;
+        }
+        else
+        {
+            Cam->Position -= 0.3f*MoveVector;
+            Cam->Target -= 0.3f*MoveVector;
+        }
     }
     if (KeyboardState[SDL_SCANCODE_D])
     {
         vec3 MoveVector = {Cam->Space.V.x, 0.f, Cam->Space.V.z};
         State->Player.Position += 0.3f*MoveVector;
-        Cam->Position += 0.3f*MoveVector;
-        Cam->Target += 0.3f*MoveVector;
+        if(CheckCollision(State->Player, State->Scene))
+        {
+            State->Player.Position -= 0.3f*MoveVector;
+        }
+        else
+        {
+            Cam->Position += 0.3f*MoveVector;
+            Cam->Target += 0.3f*MoveVector;
+        }
     }
     if (KeyboardState[SDL_SCANCODE_A])
     {
         vec3 MoveVector = {Cam->Space.V.x, 0.f, Cam->Space.V.z};
         State->Player.Position -= 0.3f*MoveVector;
-        Cam->Position -= 0.3f*MoveVector;
-        Cam->Target -= 0.3f*MoveVector;
+        if(CheckCollision(State->Player, State->Scene))
+        {
+            State->Player.Position += 0.3f*MoveVector;
+        }
+        else
+        {
+            Cam->Position -= 0.3f*MoveVector;
+            Cam->Target -= 0.3f*MoveVector;
+        }
     }
     if (KeyboardState[SDL_SCANCODE_LSHIFT])
     {
@@ -364,11 +425,11 @@ Render(memory_block *Memory)
     mat4 PerspectiveMatrix = PerspectiveProjection(90.f, 1024.f/720.f, 0.1f, 100.f);
 
     glUseProgram(State->ShadingProgram);
-    glBindTexture(GL_TEXTURE_2D, Texture);
     mat4 ScreenSpaceTransform = PerspectiveMatrix * CameraMatrix;
     glUniformMatrix4fv(0, 1, false, &ScreenSpaceTransform[0][0]);
     glUniform3fv(1, 1, &Cam->Position[0]);
-    glUniform3fv(3, 2, &State->MainLight.Mesh.Position[0]);
+    glUniform3fv(3, 1, &State->MainLight.Mesh.Position[0]);
+    glUniform3fv(4, 1, &State->MainLight.Color[0]);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     mat4 ModelTransform = TranslationMatrix4(State->Scene.Position);

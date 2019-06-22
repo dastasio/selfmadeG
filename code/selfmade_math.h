@@ -88,6 +88,12 @@ typedef struct vec3
         return Result;
     }
 
+    vec3 operator+(vec3 b)
+    {
+        vec3 Result = {x+b.x, y+b.y, z+b.z};
+        return Result;
+    }
+
     vec3 operator/(real32 d)
     {
         vec3 Result = {x, y, z};
@@ -213,7 +219,7 @@ VectorLength(vec3 Vector)
 vec3
 Normalize(vec3 Vector)
 {
-    vec3 &Result = Vector;
+    vec3 Result = Vector;
     real32 Length = VectorLength(Vector);
     if(Length != 1.f)
     {
@@ -221,6 +227,16 @@ Normalize(vec3 Vector)
     }
     return Result;
 };
+
+vec3
+Absolute(vec3 Vector)
+{
+    vec3 Result = Vector;
+    if (Result.x < 0) Result.x = -Result.x;
+    if (Result.y < 0) Result.y = -Result.y;
+    if (Result.z < 0) Result.z = -Result.z;
+    return Result;
+}
 
 real32
 DotProduct(vec3 a, vec3 b)

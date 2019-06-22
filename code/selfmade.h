@@ -63,6 +63,12 @@ PopMemoryPoolToIndex(memory_pool *Pool, uint8 *TargetIndex)
     }
 }
 
+struct collider
+{
+    vec3 Center;
+    vec3 Radius;
+};
+
 struct mesh_data
 {
     //GLfloat *vertices;
@@ -72,6 +78,8 @@ struct mesh_data
     GLuint   vao;
     GLuint   bo[2];
 
+    uint32 nColliders;
+    collider *Colliders;
     vec3 Scale;
     vec3 Rotation;
     vec3 Position;
