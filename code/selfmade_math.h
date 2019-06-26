@@ -7,264 +7,211 @@
    ======================================================================== */
 #include <cmath>
 
-// TODO(dave): Remove this forword declarations
-struct mat4;
-mat4 Multiply(mat4 a, mat4 b);
-
-real32 Sin32(real32 a)
+inline real32
+Sin32(real32 a)
 {
     real32 Result = sinf(a);
-    return Result;
+    return(Result);
 };
 
-real32 Cos32(real32 a)
+inline real32
+Cos32(real32 a)
 {
     real32 Result = cosf(a);
-    return Result;
+    return(Result);
 };
 
-real32 Tan32(real32 a)
+inline real32
+Tan32(real32 a)
 {
     real32 Result = tanf(a);
-    return Result;
+    return(Result);
 };
 
-real32 SquareRoot32(real32 Value)
+inline real32
+SquareRoot32(real32 Value)
 {
     real32 Result = sqrtf(Value);
-    return Result;
+    return(Result);
 };
 
-typedef struct vec2
+inline real32
+Square(real32 Value)
 {
-    union
-    {
-        struct
-        {
-            GLfloat x;
-            GLfloat y;
-        };
-        //struct
-        //{
-        //    GLfloat r;
-        //    GLfloat g;
-        //};
-    };
-} vec2;
-
-typedef struct vec3
-{
-    union
-    {
-        struct 
-        {
-            GLfloat x;
-            GLfloat y;
-            GLfloat z;
-        };
-        //struct
-        //{
-        //    GLfloat r;
-        //    GLfloat g;
-        //    GLfloat b;
-        //};
-    };
-
-    vec3 operator-()
-    {
-        vec3 Result = {-x, -y, -z};
-        return Result;
-    }
-
-    vec3 operator-(vec3 b)
-    {
-        vec3 Result = {x - b.x, y - b.y, z - b.z};
-        return Result;
-    }
-
-    vec3 operator*(real32 m)
-    {
-        vec3 Result = {x*m, y*m, z*m};
-        return Result;
-    }
-
-    vec3 operator+(vec3 b)
-    {
-        vec3 Result = {x+b.x, y+b.y, z+b.z};
-        return Result;
-    }
-
-    vec3 operator/(real32 d)
-    {
-        vec3 Result = {x, y, z};
-        Result.x /= d;
-        Result.y /= d;
-        Result.z /= d;
-        return Result;
-    }
-
-    void operator+=(vec3 b)
-    {
-        x += b.x;
-        y += b.y;
-        z += b.z;
-    }
-
-    void operator-=(vec3 b)
-    {
-        x -= b.x;
-        y -= b.y;
-        z -= b.z;
-    }
-
-    void operator/=(real32 d)
-    {
-        x /= d;
-        y /= d;
-        z /= d;
-    }
-    
-    GLfloat &operator[](uint32 i)
-    {
-        return *((GLfloat *)this + i);
-    }
-} vec3;
-vec3 operator*(real32 a, vec3 b)
-{
-    vec3 Result = {a*b.x, a*b.y, a*b.z};
-    return Result;
+    real32 Result = Value*Value;
+    return(Result);
 }
 
-typedef struct vec4
+inline real32
+Absolute(real32 Value)
 {
-    union
+    real32 Result = (Value < 0) ? -Value : Value;
+    return(Result);
+}
+
+union V2
+{
+    struct
     {
-        struct
-        {
-            GLfloat x;
-            GLfloat y;
-            GLfloat z;
-            GLfloat w;
-        };
-        //struct
-        //{
-        //    GLfloat r;
-        //    GLfloat g;
-        //    GLfloat b;
-        //    GLfloat a;
-        //};
+        real32 X;
+        real32 Y;
     };
-
-    GLfloat &operator[](uint32 i)
-    {
-        return *((GLfloat *)this + i);
-    }
-} vec4;
-
-typedef struct mat3
-{
-    vec3 c0;
-    vec3 c1;
-    vec3 c2;
-
-    vec3 &operator[](uint32 i)
-    {
-        return *((vec3 *)this + i);
-    }
-} mat3;
-
-typedef struct mat4
-{
-    vec4 c0;
-    vec4 c1;
-    vec4 c2;
-    vec4 c3;
-    
-    mat4 operator*(mat4 b)
-    {
-        return Multiply(*this, b);
-    }
-
-    void operator*=(mat4 b)
-    {
-        *this = Multiply(*this, b);
-    }
-
-    vec4 &operator[](uint32 i)
-    {
-        return *((vec4 *)this + i);
-    }
-} mat4;
-
-struct camera_space
-{
-    vec3 U;
-    vec3 V;
-    vec3 N;
-
-    mat4 Matrix;
+    real32 E[2];
 };
 
-real32
-VectorLength(vec3 Vector)
+union V3
+{
+    struct 
+    {
+        real32 X;
+        real32 Y;
+        real32 Z;
+    };
+    real32 E[3];
+};
+
+union V4
+{
+    struct
+    {
+        real32 X;
+        real32 Y;
+        real32 Z;
+        real32 W;
+    };
+    real32 E[4];
+};
+
+inline V3
+operator-(V3 A)
+{
+    V3 Result;
+    Result.X = -A.X;
+    Result.Y = -A.Y;
+    Result.Z = -A.Z;
+    return(Result);
+}
+
+inline V3
+operator-(V3 A, V3 B)
+{
+    V3 Result;
+    Result.X = A.X - B.X;
+    Result.Y = A.Y - B.Y;
+    Result.Z = A.Z - B.Z;
+    return(Result);
+}
+
+inline V3
+operator*(V3 A, real32 B)
+{
+    V3 Result;
+    Result.X = A.X*B;
+    Result.Y = A.Y*B;
+    Result.Z = A.Z*B;
+    return(Result);
+}
+
+inline V3
+operator*(real32 B, V3 A)
+{
+    V3 Result = A * B;
+    return(Result);
+}
+
+inline V3
+operator+(V3 A, V3 B)
+{
+    V3 Result;
+    Result.X = A.X+B.X;
+    Result.Y = A.Y+B.Y;
+    Result.Z = A.Z+B.Z;
+    return(Result);
+}
+
+inline V3
+operator/(V3 A, real32 B)
+{
+    V3 Result;
+    Result.X = A.X/B;
+    Result.Y = A.Y/B;
+    Result.Z = A.Z/B;
+    return(Result);
+}
+
+inline V3 &
+operator+=(V3 &A, V3 B)
+{
+    A = A + B;
+    return(A);
+}
+
+inline V3 &
+operator-=(V3 &A, V3 B)
+{
+    A = A - B;
+    return(A);
+}
+
+inline V3 &
+operator/=(V3 &A, real32 B)
+{
+    A = A / B;
+    return(A);
+}
+
+inline bool
+operator<=(V3 A, V3 B)
+{
+    bool Result = (A.X <= B.X) && (A.Y <= B.Y) && (A.Z <= B.Z);
+    return(Result);
+}
+
+inline real32
+VectorLength(V3 Vector)
 {
     real32 Result = SquareRoot32(
-        Vector.x*Vector.x +
-        Vector.y*Vector.y +
-        Vector.z*Vector.z
+        Square(Vector.X) +
+        Square(Vector.Y) +
+        Square(Vector.Z)
     );
-    return Result;
+    return(Result);
 };
 
-vec3
-Normalize(vec3 Vector)
+inline V3
+Normalize(V3 Vector)
 {
-    vec3 Result = Vector;
+    V3 Result = Vector;
     real32 Length = VectorLength(Vector);
     if(Length != 1.f)
     {
         Result /= Length;
     }
-    return Result;
+    return(Result);
 };
 
-vec3
-Absolute(vec3 Vector)
+inline V3
+Absolute(V3 Vector)
 {
-    vec3 Result = Vector;
-    if (Result.x < 0) Result.x = -Result.x;
-    if (Result.y < 0) Result.y = -Result.y;
-    if (Result.z < 0) Result.z = -Result.z;
-    return Result;
+    V3 Result = Vector;
+    if (Result.X < 0) Result.X = -Result.X;
+    if (Result.Y < 0) Result.Y = -Result.Y;
+    if (Result.Z < 0) Result.Z = -Result.Z;
+    return(Result);
 }
 
-real32
-DotProduct(vec3 a, vec3 b)
+inline V3
+CrossProduct(V3 A, V3 B)
 {
-    real32 Result = a.x*b.x + a.y*b.y + a.z*b.z;
-    return Result;
+    V3 Result;
+    Result.X = A.Y*B.Z - A.Z*B.Y;
+    Result.Y = A.Z*B.X - A.X*B.Z;
+    Result.Z = A.X*B.Y - A.Y*B.X;
+    return(Result);
 }
 
-real32
-DotProduct(vec4 a, vec4 b)
-{
-    real32 Result = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
-    return Result;
-}
-
-vec3
-CrossProduct(vec3 a, vec3 b)
-{
-    vec3 Result = {
-        a.y*b.z - a.z*b.y,
-        a.z*b.x - a.x*b.z,
-        a.x*b.y - a.y*b.x
-    };
-    return Result;
-}
-
-bool
-IsUnitVector(vec3 Vector)
+inline bool
+IsUnitVector(V3 Vector)
 {
     bool Result = false;
     real32 Length = VectorLength(Vector);
@@ -272,60 +219,124 @@ IsUnitVector(vec3 Vector)
     {
         Result = true;
     }
-    return Result;
+    return(Result);
 };
 
-inline mat3
-IdentityMatrix3()
+inline real32
+Inner(V3 A, V3 B)
 {
-    mat3 Result = {};
-    Result[0][0] = 1.f;
-    Result[1][1] = 1.f;
-    Result[2][2] = 1.f;
+    real32 Result = A.X*B.X + A.Y*B.Y + A.Z*B.Z;
+    return(Result);
+}
 
-    return Result;
+inline real32
+Inner(V4 A, V4 B)
+{
+    real32 Result = A.X*B.X + A.Y*B.Y + A.Z*B.Z + A.W*B.W;
+    return(Result);
+}
+
+inline V3
+Reflect(V3 I, V3 N)
+{
+    V3 Result = I - 2*Inner(N, I)*N;
+    return(Result);
+}
+
+inline V3
+SquareRoot32(V3 Value)
+{
+    V3 Result;
+    Result.X = SquareRoot32(Value.X);
+    Result.Y = SquareRoot32(Value.Y);
+    Result.Z = SquareRoot32(Value.Z);
+    return(Result);
 };
 
-inline mat3
-Transpose(mat3 m)
+inline V3
+Square(V3 Value)
 {
-    mat3 Result = {
-        {m[0][0], m[1][0], m[2][0]},
-        {m[0][1], m[1][1], m[2][1]},
-        {m[0][2], m[1][2], m[2][2]}
+    V3 Result;
+    Result.X = Value.X*Value.X;
+    Result.Y = Value.Y*Value.Y;
+    Result.Z = Value.Z*Value.Z;
+    return(Result);
+}
+
+union M3
+{
+    struct
+    {
+        V3 C0;
+        V3 C1;
+        V3 C2;
     };
-    return Result;
+    V3 C[3];
+    real32 E[3][3];
 };
 
-inline mat4
-IdentityMatrix4()
+union M4
 {
-    mat4 Result = {};
-    Result[0][0] = 1.f;
-    Result[1][1] = 1.f;
-    Result[2][2] = 1.f;
-    Result[3][3] = 1.f;
-
-    return Result;
-};
-
-inline mat4
-Transpose(mat4 m)
-{
-    mat4 Result = {
-        {m[0][0], m[1][0], m[2][0], m[3][0]},
-        {m[0][1], m[1][1], m[2][1], m[3][1]},
-        {m[0][2], m[1][2], m[2][2], m[3][2]},
-        {m[0][3], m[1][3], m[2][3], m[3][3]}
+    struct
+    {
+        V4 C0;
+        V4 C1;
+        V4 C2;
+        V4 C3;
     };
-    return Result;
+    V4 C[4];
+    real32 E[4][4];
 };
 
-inline mat4
-Multiply(mat4 a, mat4 b)
+inline M3
+Transpose(M3 A)
 {
-    a = Transpose(a);
-    mat4 Result;
+    M3 Result;
+    Result.E[0][0] = A.E[0][0];
+    Result.E[0][1] = A.E[1][0];
+    Result.E[0][2] = A.E[2][0];
+
+    Result.E[1][0] = A.E[0][1];
+    Result.E[1][1] = A.E[1][1];
+    Result.E[1][2] = A.E[2][1];
+
+    Result.E[2][0] = A.E[0][2];
+    Result.E[2][1] = A.E[1][2];
+    Result.E[2][2] = A.E[2][2];
+    return(Result);
+};
+
+inline M4
+Transpose(M4 A)
+{
+    M4 Result;
+    Result.E[0][0] = A.E[0][0];
+    Result.E[0][1] = A.E[1][0];
+    Result.E[0][2] = A.E[2][0];
+    Result.E[0][3] = A.E[3][0];
+
+    Result.E[1][0] = A.E[0][1];
+    Result.E[1][1] = A.E[1][1];
+    Result.E[1][2] = A.E[2][1];
+    Result.E[1][3] = A.E[3][1];
+
+    Result.E[2][0] = A.E[0][2];
+    Result.E[2][1] = A.E[1][2];
+    Result.E[2][2] = A.E[2][2];
+    Result.E[2][3] = A.E[3][2];
+
+    Result.E[3][0] = A.E[0][3];
+    Result.E[3][1] = A.E[1][3];
+    Result.E[3][2] = A.E[2][3];
+    Result.E[3][3] = A.E[3][3];
+    return(Result);
+};
+
+inline M4
+operator*(M4 A, M4 B)
+{
+    A = Transpose(A);
+    M4 Result;
     for(uint32 Column = 0;
         Column < 4;
         ++Column)
@@ -334,123 +345,156 @@ Multiply(mat4 a, mat4 b)
             Row < 4;
             ++Row)
         {
-            Result[Column][Row] = DotProduct(a[Row], b[Column]);
+            //V4 RowVector = {A.E[Row][0], A.E[Row][1], A.E[Row][2], A.E[Row][3]};
+            //V4 ColumnVector = {B.E[Column][0], B.E[Column][1], B.E[Column][2], B.E[Column][3]};
+            Result.E[Column][Row] = Inner(A.C[Row], B.C[Column]);
         }
     }
-    return Result;
+    return(Result);
 }
 
-mat4
-Matrix3ToMatrix4(mat3 m)
+inline M4 &
+operator*=(M4 &A, M4 B)
 {
-    mat4 Result = { 
-        {m[0].x, m[0].y, m[0].z, 0.f}, // Column 0
-        {m[1].x, m[1].y, m[1].z, 0.f}, // Column 1
-        {m[2].x, m[2].y, m[2].z, 0.f}, // Column 2
-        {m[3].x, m[3].y, m[3].z, 1.f}  // Column 3
-    };
-    return Result;
+    A = A * B;
+    return(A);
 }
 
-mat3
-RotationMatrix3(vec3 Axis, real32 Angle)
+struct camera_space
+{
+    V3 U;
+    V3 V;
+    V3 N;
+
+    M4 Matrix;
+};
+
+inline M3
+IdentityMatrix3()
+{
+    M3 Result = {};
+    Result.E[0][0] = 1.f;
+    Result.E[1][1] = 1.f;
+    Result.E[2][2] = 1.f;
+    return(Result);
+};
+
+inline M4
+IdentityMatrix4()
+{
+    M4 Result = {};
+    Result.E[0][0] = 1.f;
+    Result.E[1][1] = 1.f;
+    Result.E[2][2] = 1.f;
+    Result.E[3][3] = 1.f;
+    return(Result);
+};
+
+M4
+Matrix3ToMatrix4(M3 A)
+{
+    M4 Result;
+    Result.C[0] = {A.E[0][0], A.E[0][1], A.E[0][2], 0.f}; // Column 0
+    Result.C[1] = {A.E[1][0], A.E[1][1], A.E[1][2], 0.f}; // Column 1
+    Result.C[2] = {A.E[2][0], A.E[2][1], A.E[2][2], 0.f}; // Column 2
+    Result.C[3] = {0.f, 0.f, 0.f, 1.f}; // Column 3
+    return(Result);
+}
+
+M3
+RotationMatrix3(V3 Axis, real32 Angle)
 {
     real32 C = Cos32(Angle);
     real32 S = Sin32(Angle);
     real32 OneMinusCos = 1.f - C;
-    mat3 Result =
-    {
-        { // Column 0
-            C + Axis.x*Axis.x*OneMinusCos,
-            Axis.y*Axis.x*OneMinusCos + Axis.z*S,
-            Axis.z*Axis.x*OneMinusCos - Axis.y*S
-        },
-        { // Column 1
-            Axis.x*Axis.y*OneMinusCos - Axis.z*S,
-            C + Axis.y*Axis.y*OneMinusCos,
-            Axis.z*Axis.y*OneMinusCos + Axis.x*S
-        },
-        { // Column 2
-            Axis.x*Axis.z*OneMinusCos + Axis.y*S,
-            Axis.y*Axis.z*OneMinusCos - Axis.x*S,
-            C + Axis.z*Axis.z*OneMinusCos
-        }
+    M3 Result;
+    Result.C[0] = { // Column 0
+        C + Axis.X*Axis.X*OneMinusCos,
+        Axis.Y*Axis.X*OneMinusCos + Axis.Z*S,
+        Axis.Z*Axis.X*OneMinusCos - Axis.Y*S
     };
-
-    return Result;
+    Result.C[1] = { // Column 1
+        Axis.X*Axis.Y*OneMinusCos - Axis.Z*S,
+        C + Axis.Y*Axis.Y*OneMinusCos,
+        Axis.Z*Axis.Y*OneMinusCos + Axis.X*S
+    };
+    Result.C[2] = { // Column 2
+        Axis.X*Axis.Z*OneMinusCos + Axis.Y*S,
+        Axis.Y*Axis.Z*OneMinusCos - Axis.X*S,
+        C + Axis.Z*Axis.Z*OneMinusCos
+    };
+    return(Result);
 }
 
-mat3
-ScaleMatrix3(vec3 s)
+M3
+ScaleMatrix3(V3 A)
 {
-    mat3 Result = IdentityMatrix3();
-    Result[0][0] = s.x;
-    Result[1][1] = s.y;
-    Result[2][2] = s.z;
-    return Result;
+    M3 Result = IdentityMatrix3();
+    Result.E[0][0] = A.X;
+    Result.E[1][1] = A.Y;
+    Result.E[2][2] = A.Z;
+    return(Result);
 }
 
-mat4
-RotationMatrix4(vec3 Axis, real32 Angle)
+M4
+RotationMatrix4(V3 Axis, real32 Angle)
 {
-    mat4 Result;
-    mat3 Rotation3 = RotationMatrix3(Axis, Angle);
+    M4 Result;
+    M3 Rotation3 = RotationMatrix3(Axis, Angle);
     Result = Matrix3ToMatrix4(Rotation3);
-    return Result;
+    return(Result);
 }
 
-mat4
-ScaleMatrix4(vec4 s)
+M4
+ScaleMatrix4(V4 A)
 {
-    mat4 Result = IdentityMatrix4();
-    Result[0][0] = s.x;
-    Result[1][1] = s.y;
-    Result[2][2] = s.z;
-    Result[3][3] = s.w;
-    return Result;
+    M4 Result = IdentityMatrix4();
+    Result.E[0][0] = A.X;
+    Result.E[1][1] = A.Y;
+    Result.E[2][2] = A.Z;
+    Result.E[3][3] = A.W;
+    return(Result);
 }
 
-mat4
-TranslationMatrix4(vec3 t)
+M4
+TranslationMatrix4(V3 A)
 {
-    mat4 Result = IdentityMatrix4();
-    Result[3].x = t.x;
-    Result[3].y = t.y;
-    Result[3].z = t.z;
-
-    return Result;
+    M4 Result = IdentityMatrix4();
+    Result.C[3].X = A.X;
+    Result.C[3].Y = A.Y;
+    Result.C[3].Z = A.Z;
+    return(Result);
 }
 
-inline mat4
+inline M4
 PerspectiveProjection(real32 FOV, real32 AR, real32 NearZ, real32 FarZ)
 {
-    mat4 Result = {};
-    Result[0][0] = 1.f / (AR*Tan32(FOV/2.f));
-    Result[1][1] = 1.f / Tan32(FOV/2.f);
-    Result[2][2] = (-NearZ-FarZ) / (NearZ-FarZ);
-    Result[2][3] = 1.f;
-    Result[3][2] = (2.f*FarZ*NearZ) / (NearZ-FarZ);
-    return Result;
+    M4 Result = {};
+    Result.E[0][0] = 1.f / (AR*Tan32(FOV/2.f));
+    Result.E[1][1] = 1.f / Tan32(FOV/2.f);
+    Result.E[2][2] = (-NearZ-FarZ) / (NearZ-FarZ);
+    Result.E[2][3] = 1.f;
+    Result.E[3][2] = (2.f*FarZ*NearZ) / (NearZ-FarZ);
+    return(Result);
 }
 
-inline mat4
+inline M4
 ComputeCameraSpace(camera_space *CameraSpace,
-                   vec3 NewPosition, vec3 NewTarget, vec3 NewUp)
+                   V3 NewPosition, V3 NewTarget, V3 NewUp)
 {
     CameraSpace->N = Normalize(NewTarget - NewPosition);
     CameraSpace->V = Normalize(CrossProduct(CameraSpace->N, NewUp));
     CameraSpace->U = Normalize(CrossProduct(CameraSpace->V, CameraSpace->N));
 
-    vec3 &U = CameraSpace->U;
-    vec3 &V = CameraSpace->V;
-    vec3 &N = CameraSpace->N;
-    mat4 Result = {
-        { V.x, U.x, N.x, 0.f },
-        { V.y, U.y, N.y, 0.f },
-        { V.z, U.z, N.z, 0.f },
-        { 0.f, 0.f, 0.f, 1.f }
-    };
+    V3 &U = CameraSpace->U;
+    V3 &V = CameraSpace->V;
+    V3 &N = CameraSpace->N;
+    M4 Result;
+    Result.C[0] = { V.X, U.X, N.X, 0.f };
+    Result.C[1] = { V.Y, U.Y, N.Y, 0.f };
+    Result.C[2] = { V.Z, U.Z, N.Z, 0.f };
+    Result.C[3] = { 0.f, 0.f, 0.f, 1.f };
 
     Result *= TranslationMatrix4(-NewPosition);
-    return Result;
+    return(Result);
 }

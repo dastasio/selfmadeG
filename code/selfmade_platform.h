@@ -57,6 +57,33 @@ struct memory_block
     sdl_platform_read_entire_file *SDLPlatformReadEntireFile;
 };
 
+#define STICK_DEADZONE 16384
+#define STICK_VALUE(x) ((((x) >= -STICK_DEADZONE) && ((x) <= STICK_DEADZONE)) ? 0.f : ((real32)(x) / 32768.f))
+struct input_button_state
+{
+    real32 Value;
+};
+
+struct input
+{
+    input_button_state ArrowUp;
+    input_button_state ArrowDown;
+    input_button_state ArrowRight;
+    input_button_state ArrowLeft;
+
+    input_button_state ActionA;
+    input_button_state ActionB;
+    input_button_state ActionX;
+    input_button_state ActionY;
+
+    input_button_state LeftAxisX;
+    input_button_state LeftAxisY;
+    input_button_state RightAxisX;
+    input_button_state RightAxisY;
+    input_button_state TriggerLeft;
+    input_button_state TriggerRight;
+};
+
 #ifdef __cplusplus
 }
 #endif

@@ -10,6 +10,11 @@
 #include "selfmade_platform.h"
 #include "selfmade_math.h"
 
+//#define 2PI 6.28318530718f
+#define  PI 3.14159265358f
+#define PI2 1.57079632679f
+#define PHYSICS_TIMESTEP 0.008333333333333f
+
 #if SELFX_SLOW
 #define Assert(x) if(!x) {*(int *)0 = 0;}
 #else
@@ -65,8 +70,8 @@ PopMemoryPoolToIndex(memory_pool *Pool, uint8 *TargetIndex)
 
 struct collider
 {
-    vec3 Center;
-    vec3 Radius;
+    V3 Center;
+    V3 Radius;
 };
 
 struct mesh_data
@@ -80,23 +85,29 @@ struct mesh_data
 
     uint32 nColliders;
     collider *Colliders;
-    vec3 Scale;
-    vec3 Rotation;
-    vec3 Position;
+    V3 Scale;
+    V3 Rotation;
+    V3 Position;
+
+    V3 dPosition;     // m/s
+    V3 ddPosition;
 };
 
 struct light_data
 {
     mesh_data Mesh;
-    vec3 Color;
+    V3 Color;
 };
 
 struct camera_data
 {
-    vec3 Position;
-    vec3 Target;
-    vec3 Up;
+    V3 Position;
+    V3 Target;
+    V3 Up;
 
+    real32 Pitch;
+    real32 Yaw;
+    real32 DistanceFromTarget;
     camera_space Space;
 };
 
@@ -111,7 +122,6 @@ struct game_state
 
     memory_pool MemoryPool;
 };
-
 
 #define COMMON_SELFMADEX_H
 #endif

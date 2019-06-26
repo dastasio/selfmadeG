@@ -87,8 +87,9 @@ int
 main()
 {
     SDL_SetMainReady();
-    if (SDL_Init(SDL_INIT_VIDEO) >= 0)
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER) >= 0)
     {
+        SDL_GameControllerOpen(0);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
@@ -105,7 +106,7 @@ main()
             if (VSYNC(-1) < 0) VSYNC(1);
             if (WindowContext)
             {
-                vec4 Vector = { 3, 5, 8, 7 };
+                V4 Vector = { 3, 5, 8, 7 };
 
                 memory_block MainMemory = {};
                 MainMemory.StorageSize = Megabytes(32);
@@ -114,18 +115,44 @@ main()
 
                 gladLoadGLLoader(SDL_GL_GetProcAddress);
                 
-                Uint32 currentTime = 0;
-                Uint32 lastFrameTime = SDL_GetTicks();
+                uint32 CurrentTime = 0;
+                uint32 LastFrameTime = SDL_GetTicks();
+                real32 SecondsToAdvance = 0;
+                input Input[2] = {};
+                input *OldInput = &Input[0];
+                input *NewInput = &Input[1];
                 while (GlobalRunning)
                 {
                     SDL_Event e;
-                    if (SDL_PollEvent(&e))
+                    while (SDL_PollEvent(&e))
                     {
                         switch (e.type)
                         {
                             case SDL_QUIT:
+                            {
                                 GlobalRunning = false;
-                                break;
+                            } break;
+
+                            case SDL_CONTROLLERAXISMOTION:
+                            {
+                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX)
+                                {
+                                    NewInput->LeftAxisX.Value = STICK_VALUE(e.caxis.value);
+                                }
+                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY)
+                                {
+                                    NewInput->LeftAxisY.Value = STICK_VALUE(e.caxis.value);
+                                }
+                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTX)
+                                {
+                                    NewInput->RightAxisX.Value = STICK_VALUE(e.caxis.value);
+                                }
+                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTY)
+                                {
+                                    NewInput->RightAxisY.Value = STICK_VALUE(e.caxis.value);
+                                }
+                            } break;
+                            
                             default: break;
                         }
                     }
@@ -133,13 +160,17 @@ main()
                     {
                         GlobalRunning = false;
                     }
+                    CurrentTime = SDL_GetTicks();
 
-                    Render(&MainMemory);
+                    SecondsToAdvance += (real32)(CurrentTime - LastFrameTime) / 1000.f;
+                    LastFrameTime = CurrentTime;
+                    UpdateAndRender(&MainMemory, NewInput, &SecondsToAdvance);
                     SDL_GL_SwapWindow(Window);
 
-                    currentTime = SDL_GetTicks();
+                    input *SwapInput = NewInput;
+                    NewInput = OldInput;
+                    OldInput = SwapInput;
                     //SDL_Log("frame time: %u", currentTime - lastFrameTime);
-                    lastFrameTime = currentTime;
                 }
             }
             else
