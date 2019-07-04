@@ -66,22 +66,25 @@ struct input_button_state
 
 struct input
 {
-    input_button_state ArrowUp;
-    input_button_state ArrowDown;
-    input_button_state ArrowRight;
-    input_button_state ArrowLeft;
+    input_button_state Up;
+    input_button_state Down;
+    input_button_state Left;
+    input_button_state Right;
 
-    input_button_state ActionA;
-    input_button_state ActionB;
-    input_button_state ActionX;
-    input_button_state ActionY;
+    input_button_state A;
+    input_button_state B;
+    input_button_state X;
+    input_button_state Y;
 
-    input_button_state LeftAxisX;
-    input_button_state LeftAxisY;
-    input_button_state RightAxisX;
-    input_button_state RightAxisY;
-    input_button_state TriggerLeft;
-    input_button_state TriggerRight;
+    input_button_state LB;
+    input_button_state RB;
+
+    input_button_state LX;
+    input_button_state LY;
+    input_button_state RX;
+    input_button_state RY;
+    input_button_state LT;
+    input_button_state RT;
 };
 
 #ifdef __cplusplus

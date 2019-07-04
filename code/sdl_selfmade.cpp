@@ -118,6 +118,11 @@ main()
                 uint32 CurrentTime = 0;
                 uint32 LastFrameTime = SDL_GetTicks();
                 real32 SecondsToAdvance = 0;
+                SDL_GameController *GamePad = 0;
+                if(SDL_NumJoysticks())
+                {
+                    GamePad = SDL_GameControllerOpen(0);
+                }
                 input Input[2] = {};
                 input *OldInput = &Input[0];
                 input *NewInput = &Input[1];
@@ -133,33 +138,61 @@ main()
                                 GlobalRunning = false;
                             } break;
 
-                            case SDL_CONTROLLERAXISMOTION:
-                            {
-                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX)
-                                {
-                                    NewInput->LeftAxisX.Value = STICK_VALUE(e.caxis.value);
-                                }
-                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY)
-                                {
-                                    NewInput->LeftAxisY.Value = STICK_VALUE(e.caxis.value);
-                                }
-                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTX)
-                                {
-                                    NewInput->RightAxisX.Value = STICK_VALUE(e.caxis.value);
-                                }
-                                if(e.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTY)
-                                {
-                                    NewInput->RightAxisY.Value = STICK_VALUE(e.caxis.value);
-                                }
-                            } break;
-                            
                             default: break;
                         }
                     }
-                    if (SDL_GetKeyboardState(0)[SDL_SCANCODE_ESCAPE])
+                    uint8 *KeyboardState = (uint8 *)SDL_GetKeyboardState(0);
+                    if (KeyboardState[SDL_SCANCODE_ESCAPE])
                     {
                         GlobalRunning = false;
                     }
+
+                    if(GamePad)
+                    {
+#define GamePadAxis(b) SDL_GameControllerGetAxis(GamePad, b)
+#define GamePadButton(b) SDL_GameControllerGetButton(GamePad, b)
+                        int16 RawLX = GamePadAxis(SDL_CONTROLLER_AXIS_LEFTX);
+                        int16 RawLY = GamePadAxis(SDL_CONTROLLER_AXIS_LEFTY);
+                        int16 RawRX = GamePadAxis(SDL_CONTROLLER_AXIS_RIGHTX);
+                        int16 RawRY = GamePadAxis(SDL_CONTROLLER_AXIS_RIGHTY);
+                        int16 RawLT = GamePadAxis(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+                        int16 RawRT = GamePadAxis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+                        NewInput->Up.Value = GamePadButton(SDL_CONTROLLER_BUTTON_DPAD_UP);
+                        NewInput->Down.Value = GamePadButton(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+                        NewInput->Left.Value = GamePadButton(SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+                        NewInput->Right.Value = GamePadButton(SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+
+                        NewInput->A.Value = GamePadButton(SDL_CONTROLLER_BUTTON_A);
+                        NewInput->B.Value = GamePadButton(SDL_CONTROLLER_BUTTON_B);
+                        NewInput->X.Value = GamePadButton(SDL_CONTROLLER_BUTTON_X);
+                        NewInput->Y.Value = GamePadButton(SDL_CONTROLLER_BUTTON_Y);
+
+                        NewInput->LX.Value = STICK_VALUE(RawLX);
+                        NewInput->LY.Value = STICK_VALUE(RawLY);
+                        NewInput->RX.Value = STICK_VALUE(RawRX);
+                        NewInput->RY.Value = STICK_VALUE(RawRY);
+                        NewInput->LT.Value = STICK_VALUE(RawLT);
+                        NewInput->RT.Value = STICK_VALUE(RawRT);
+                    }
+#if 1
+                    if (KeyboardState[SDL_SCANCODE_W])
+                    {
+                        NewInput->LY.Value = -1.f;
+                    }
+                    if (KeyboardState[SDL_SCANCODE_S])
+                    {
+                        NewInput->LY.Value = 1.f;
+                    }
+                    if (KeyboardState[SDL_SCANCODE_D])
+                    {
+                        NewInput->LX.Value = 1.f;
+                    }
+                    if (KeyboardState[SDL_SCANCODE_A])
+                    {
+                        NewInput->LX.Value = -1.f;
+                    }
+#endif
                     CurrentTime = SDL_GetTicks();
 
                     SecondsToAdvance += (real32)(CurrentTime - LastFrameTime) / 1000.f;
@@ -170,6 +203,7 @@ main()
                     input *SwapInput = NewInput;
                     NewInput = OldInput;
                     OldInput = SwapInput;
+                    *NewInput = {};
                     //SDL_Log("frame time: %u", currentTime - lastFrameTime);
                 }
             }

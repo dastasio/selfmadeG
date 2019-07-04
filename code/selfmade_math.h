@@ -49,6 +49,34 @@ Absolute(real32 Value)
     return(Result);
 }
 
+inline real32
+Min(real32 A, real32 B)
+{
+    real32 Result = (A < B) ? A : B;
+    return(Result);
+}
+
+inline real32
+Max(real32 A, real32 B)
+{
+    real32 Result = (A > B) ? A : B;
+    return(Result);
+}
+
+inline uint32
+Max(uint32 A, uint32 B)
+{
+    uint32 Result = (A > B) ? A : B;
+    return(Result);
+}
+
+inline int32
+Max(int32 A, int32 B)
+{
+    int32 Result = (A > B) ? A : B;
+    return(Result);
+}
+
 union V2
 {
     struct
@@ -161,34 +189,18 @@ operator/=(V3 &A, real32 B)
 }
 
 inline bool
+operator==(V3 A, V3 B)
+{
+    bool Result = (A.X == B.X) && (A.Y == B.Y) && (A.Z == B.Z);
+    return(Result);
+}
+
+inline bool
 operator<=(V3 A, V3 B)
 {
     bool Result = (A.X <= B.X) && (A.Y <= B.Y) && (A.Z <= B.Z);
     return(Result);
 }
-
-inline real32
-VectorLength(V3 Vector)
-{
-    real32 Result = SquareRoot32(
-        Square(Vector.X) +
-        Square(Vector.Y) +
-        Square(Vector.Z)
-    );
-    return(Result);
-};
-
-inline V3
-Normalize(V3 Vector)
-{
-    V3 Result = Vector;
-    real32 Length = VectorLength(Vector);
-    if(Length != 1.f)
-    {
-        Result /= Length;
-    }
-    return(Result);
-};
 
 inline V3
 Absolute(V3 Vector)
@@ -201,7 +213,7 @@ Absolute(V3 Vector)
 }
 
 inline V3
-CrossProduct(V3 A, V3 B)
+Cross(V3 A, V3 B)
 {
     V3 Result;
     Result.X = A.Y*B.Z - A.Z*B.Y;
@@ -209,18 +221,6 @@ CrossProduct(V3 A, V3 B)
     Result.Z = A.X*B.Y - A.Y*B.X;
     return(Result);
 }
-
-inline bool
-IsUnitVector(V3 Vector)
-{
-    bool Result = false;
-    real32 Length = VectorLength(Vector);
-    if(Length == 1.f)
-    {
-        Result = true;
-    }
-    return(Result);
-};
 
 inline real32
 Inner(V3 A, V3 B)
@@ -243,6 +243,20 @@ Reflect(V3 I, V3 N)
     return(Result);
 }
 
+inline real32
+LengthSq(V3 Vector)
+{
+    real32 Result = Inner(Vector, Vector);
+    return(Result);
+}
+
+inline real32
+Length(V3 Vector)
+{
+    real32 Result = SquareRoot32(LengthSq(Vector));
+    return(Result);
+};
+
 inline V3
 SquareRoot32(V3 Value)
 {
@@ -262,6 +276,30 @@ Square(V3 Value)
     Result.Z = Value.Z*Value.Z;
     return(Result);
 }
+
+inline V3
+Normalize(V3 Vector)
+{
+    V3 Result = Vector;
+    real32 Modulus = LengthSq(Vector);
+    if(Modulus != 1.f)
+    {
+        Result /= SquareRoot32(Modulus);
+    }
+    return(Result);
+};
+
+inline bool
+IsUnitVector(V3 Vector)
+{
+    bool Result = false;
+    real32 Modulus = LengthSq(Vector);
+    if(Modulus == 1.f)
+    {
+        Result = true;
+    }
+    return(Result);
+};
 
 union M3
 {
@@ -478,13 +516,23 @@ PerspectiveProjection(real32 FOV, real32 AR, real32 NearZ, real32 FarZ)
     return(Result);
 }
 
+inline M3
+NewCoordinateSpace(V3 U, V3 V, V3 N)
+{
+    M3 Result;
+    Result.C[0] = {V.X, U.X, N.X};
+    Result.C[1] = {V.Y, U.Y, N.Y};
+    Result.C[2] = {V.Z, U.Z, N.Z};
+    return(Result);
+}
+
 inline M4
 ComputeCameraSpace(camera_space *CameraSpace,
                    V3 NewPosition, V3 NewTarget, V3 NewUp)
 {
     CameraSpace->N = Normalize(NewTarget - NewPosition);
-    CameraSpace->V = Normalize(CrossProduct(CameraSpace->N, NewUp));
-    CameraSpace->U = Normalize(CrossProduct(CameraSpace->V, CameraSpace->N));
+    CameraSpace->V = Normalize(Cross(CameraSpace->N, NewUp));
+    CameraSpace->U = Normalize(Cross(CameraSpace->V, CameraSpace->N));
 
     V3 &U = CameraSpace->U;
     V3 &V = CameraSpace->V;
