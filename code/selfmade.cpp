@@ -18,13 +18,18 @@ ReadOBJ(debug_file *RawObj, memory_pool *Pool, bool IsTriangulated, bool FillMis
     uint32 vtCount = 0;
     uint32 vnCount = 0;
     uint32 fCount = 0;
+    uint32 oCount = 0;
     // TODO(dave): Optimize into one loop
     for (char *c = RawObj->Data; (c - RawObj->Data) < RawObj->Length;)
     {
         switch (*c++)
         {
             // TODO(dave): Add multiple mesh support
-            case 'o': while(*c++ != '\n') {} break;
+            case 'o': 
+            {
+                oCount++;
+                while(*c++ != '\n') {}
+            } break;
             case 'f': fCount++; break;
             case 'v':
             {
@@ -70,6 +75,8 @@ ReadOBJ(debug_file *RawObj, memory_pool *Pool, bool IsTriangulated, bool FillMis
     real32 *vt = PushArray(Pool, (((!vtCount) && (FillMissingAttrs)) ? 1 : vtCount), GLfloat);
     real32 *vn = PushArray(Pool, (((!vnCount) && (FillMissingAttrs)) ? 1 : vnCount), GLfloat);
     uint32  *f  = PushArray(Pool, fCount, GLuint);
+    debug_obj_object *o = PushArray(Pool, oCount, debug_obj_object);
+    File.Objects = o--;
     for (GLchar *c = RawObj->Data; (c - RawObj->Data) < RawObj->Length;)
     {
         switch (*c++)
@@ -95,6 +102,7 @@ ReadOBJ(debug_file *RawObj, memory_pool *Pool, bool IsTriangulated, bool FillMis
                 while (*c != '\n')
                 {
                     *(f++) = strtoul( (const char *)c, &c, 10);
+                    o->IndexCount++;
                     if(*c == '/')
                     {
                         *f = strtoul( (const char *)++c, &c, 10);
@@ -102,6 +110,7 @@ ReadOBJ(debug_file *RawObj, memory_pool *Pool, bool IsTriangulated, bool FillMis
                     if(FillMissingAttrs || (*f != 0))
                     {
                         f++;//*(f++) = 0;
+                        o->IndexCount++;
                     }
                     if(*c == '/')
                     {
@@ -110,24 +119,47 @@ ReadOBJ(debug_file *RawObj, memory_pool *Pool, bool IsTriangulated, bool FillMis
                     if(FillMissingAttrs || (*f != 0))
                     {
                         f++;//*(f++) = 0;
+                        o->IndexCount++;
                     }
                 }
                 c++;
             } break;
+            case 'o':
+            {
+                if(o >= File.Objects)
+                {
+                    o->VOnePastEnd = v;
+                }
+                o++;
+                o->VStart = v;
+                o->F = f;
+                while(*c++ != '\n') {}
+            } break;
             default: while(*c++ != '\n') {} break;
         }
     }
-    v  = v  -  vCount;
-    vt = vt - vtCount;
-    vn = vn - vnCount;
-    f  = f  -  fCount;
+    o->VOnePastEnd = v;
+    v  -= vCount;
+    vt -= vtCount;
+    vn -= vnCount;
+    f -= fCount;
+    debug_obj_object *EndObject = o;
+    EndObject++;
+    o -= (oCount - 1);
     File.VP = v;
     File.VN = vn;
     File.VT = vt;
-    File.F = f;
-    File.IndexCount = fCount;
+    File.ObjectCount = oCount;
     File.VertexCount = vCount;
 
+    uint32 Sum = 0;
+    for(debug_obj_object *Obj = o;
+        Obj < EndObject;
+        ++Obj)
+    {
+        Sum += Obj->IndexCount;
+    }
+    Assert((Sum == fCount));
     return(File);
 }
 
@@ -137,12 +169,13 @@ MeshFromOBJ(debug_file *RawObj, memory_pool *Pool, GLuint vao = 0)
     mesh_data Mesh = { };
     debug_obj_file ObjFile = ReadOBJ(RawObj, Pool, 1, 1);
 
+    // TODO(dave): Support multiple objects
     uint32 LastIndex = 0;
-    GLfloat *Vertices = PushArray(Pool, ObjFile.IndexCount*8, GLfloat);
-    GLuint *Indices  = PushArray(Pool, ObjFile.IndexCount/3, GLuint);
-    for (GLuint *i = ObjFile.F; (i - ObjFile.F) < ObjFile.IndexCount; i += 3)
+    GLfloat *Vertices = PushArray(Pool, ObjFile.Objects->IndexCount*8, GLfloat);
+    GLuint *Indices  = PushArray(Pool, ObjFile.Objects->IndexCount/3, GLuint);
+    for (GLuint *i = ObjFile.Objects->F; (i - ObjFile.Objects->F) < ObjFile.Objects->IndexCount; i += 3)
     {
-        GLuint *k = ObjFile.F;
+        GLuint *k = ObjFile.Objects->F;
         while (!((*k == *i) && (*(k+1) == *(i+1)) && (*(k+2) == *(i+2)))) {k += 3;}
         if (k == i)
         {
@@ -195,20 +228,28 @@ MeshFromOBJ(debug_file *RawObj, memory_pool *Pool, GLuint vao = 0)
     return Mesh;
 }
 
-internal rigid_body
-RigidBodyFromOBJ(debug_file *RawObj, memory_pool *Pool)
+internal void
+CollidersFromOBJIntoMesh(debug_file *RawObj, memory_pool *Pool, mesh_data *Mesh)
 {
     debug_obj_file ObjFile = ReadOBJ(RawObj, Pool, 0, 0);
     Assert((ObjFile.ComponentsPerVertex == 6));
+    collision_box *Boxes = PushArray(Pool, ObjFile.ObjectCount, collision_box);
 
-    rigid_body RigidBody = {};
-    RigidBody.VP = ObjFile.VP;
-    RigidBody.VN = ObjFile.VN;
-    RigidBody.Faces = ObjFile.F;
-    RigidBody.FCount = ObjFile.IndexCount/8;
-    RigidBody.VCount = ObjFile.VertexCount/3;
-
-    return(RigidBody);
+    Mesh->RigidBody.VP = ObjFile.VP;
+    Mesh->RigidBody.VN = ObjFile.VN;
+    Mesh->RigidBody.TotalVertexCount = ObjFile.VertexCount/3;
+    for(uint32 BoxIndex = 0;
+        BoxIndex < ObjFile.ObjectCount;
+        ++BoxIndex)
+    {
+        collision_box *Box = &Boxes[BoxIndex];
+        Box->VertexRangeLowerIndex = ObjFile.Objects[BoxIndex].VStart;
+        Box->VertexRangeOnePastUpperIndex = ObjFile.Objects[BoxIndex].VOnePastEnd;
+        Box->Faces = ObjFile.Objects[BoxIndex].F;
+        Box->FaceCount = ObjFile.Objects[BoxIndex].IndexCount/8;
+    }
+    Mesh->RigidBody.Colliders = Boxes;
+    Mesh->RigidBody.ColliderCount = ObjFile.ObjectCount;
 }
 
 internal GLuint
@@ -267,15 +308,14 @@ CompileShaderProgram(sdl_platform_read_entire_file SDLPlatformReadEntireFile,
 }
 
 internal V3 *
-FarthestPointInDirection(V3 Direction, V3 *Points, uint32 Count)
+FarthestPointInDirection(V3 Direction, V3 *PointsStart, V3 *PointsOnePastEnd)
 {
-    real32 HighestDistance = Inner(Points[0], Direction);
-    V3 *MostDistantPoint = Points;
-    for(uint32 n = 1;
-        n < Count;
-        ++n)
+    real32 HighestDistance = Inner(PointsStart[0], Direction);
+    V3 *MostDistantPoint = PointsStart;
+    for(V3 *Point = &PointsStart[1];
+        Point < PointsOnePastEnd;
+        ++Point)
     {
-        V3 *Point = &Points[n];
         real32 Distance = Inner(*Point, Direction);
         if(Distance > HighestDistance)
         {
@@ -286,12 +326,12 @@ FarthestPointInDirection(V3 Direction, V3 *Points, uint32 Count)
     return(MostDistantPoint);
 }
 inline V3
-GJKMaxMinkowski(V3 *PointsA, uint32 CountA, V3 PositionA,
-                V3 *PointsB, uint32 CountB, V3 PositionB,
+GJKMaxMinkowski(V3 *PointsAStart, V3 *PointsAOnePastEnd, V3 PositionA,
+                V3 *PointsBStart, V3 *PointsBOnePastEnd, V3 PositionB,
                 V3 Direction)
 {
-    V3 *MaxA = FarthestPointInDirection(Direction, PointsA, CountA);
-    V3 *MaxB = FarthestPointInDirection(-Direction, PointsB, CountB);
+    V3 *MaxA = FarthestPointInDirection(Direction, PointsAStart, PointsAOnePastEnd);
+    V3 *MaxB = FarthestPointInDirection(-Direction, PointsBStart, PointsBOnePastEnd);
     V3 Result = (*MaxA + PositionA) - (*MaxB + PositionB);
     return(Result);
 }
@@ -512,85 +552,279 @@ GJKProcessSimplex(V3 *Simplex, uint32 *SimplexSize, V3 *Direction)
     return(ContainsOrigin);
 }
 
-internal bool32
+internal V3
 CollisionAfterMovement(mesh_data *A, mesh_data *B)
 {
     bool32 Collides = -1;
+    V3 Intersection = {};
 
-    V3 SearchDirection = A->dPCurrentStep;
-    V3 Simplex[4];
-    uint32 SimplexSize = 0;
-
-    V3 *APoints = (V3 *)&A->RigidBody.VP[0];
-    V3 *BPoints = (V3 *)&B->RigidBody.VP[0];
-    V3 NewPoint = GJKMaxMinkowski(APoints, A->RigidBody.VCount, A->Position + A->dPCurrentStep,
-                                  BPoints, B->RigidBody.VCount, B->Position, SearchDirection);//BVerts, 4, B->Position, SearchDirection);
-    Simplex[SimplexSize++] = NewPoint;
-    SearchDirection = -NewPoint;
-    while(Collides < 0)
+    for(uint32 IndexA = 0;
+        (IndexA < A->RigidBody.ColliderCount) && (Collides != 1);
+        ++IndexA)
     {
-        NewPoint = GJKMaxMinkowski(APoints, A->RigidBody.VCount, A->Position + A->dPCurrentStep,
-                                   BPoints, B->RigidBody.VCount, B->Position, SearchDirection);//BVerts, 4, B->Position, SearchDirection);
-        if(Inner(NewPoint, SearchDirection) < 0)
+        for(uint32 IndexB = 0;
+            (IndexB < B->RigidBody.ColliderCount) && (Collides != 1);
+            ++IndexB)
         {
-            Collides = 0;
-        }
-        else
-        {
-            for(uint32 s = 0;
-                (s < SimplexSize) && (Collides < 0);
-                ++s)
-            {
-                if(Simplex[s] == NewPoint)
-                {
-                    Collides = false;
-                }
-            }
-            if(Collides < 0)
-            {
-                Simplex[SimplexSize++] = NewPoint;
-                if(GJKProcessSimplex(Simplex, &SimplexSize, &SearchDirection))
-                {
-                    Collides = true;
-                }
-            }
-        }
-    }
-    
-    if(Collides)
-    {
-        real32 LeastDistance = (real32)0x2FFFFFFF;
-        V3 *NormalOfClosestFace = 0;
-        uint32 *FaceArrayEnd = B->RigidBody.Faces + B->RigidBody.FCount*8;
-        for(uint32 *Face = B->RigidBody.Faces;
-            Face < FaceArrayEnd;
-            Face += 8)
-        {
-            V3 *Normal = (V3 *)(B->RigidBody.VN + (Face[1]-1)*3);
-            if(Inner(*Normal, A->dPCurrentStep) < 0)
-            {
-                Assert((Face[1] == Face[3]) && (Face[1] == Face[5]) && (Face[1] == Face[7]));
-                V3 *vA = (V3 *)(B->RigidBody.VP + (Face[0]-1)*3);
-                V3 *vB = (V3 *)(B->RigidBody.VP + (Face[2]-1)*3);
-                V3 *vC = (V3 *)(B->RigidBody.VP + (Face[4]-1)*3);
-                V3 *vD = (V3 *)(B->RigidBody.VP + (Face[6]-1)*3);
-                real32 LenA = LengthSq(*vA - (A->Position + A->dPCurrentStep));
-                real32 LenB = LengthSq(*vB - (A->Position + A->dPCurrentStep));
-                real32 LenC = LengthSq(*vC - (A->Position + A->dPCurrentStep));
-                real32 LenD = LengthSq(*vD - (A->Position + A->dPCurrentStep));
-                real32 CurrentDistance = (LenA + LenB + LenC + LenD);
-                if(CurrentDistance < LeastDistance)
-                {
-                    LeastDistance = CurrentDistance;
-                    NormalOfClosestFace = Normal;
-                }
-            }
-        }
+            V3 SearchDirection = A->dPCurrentStep;
+            V3 Simplex[4];
+            uint32 SimplexSize = 0;
+            Collides = -1;
 
-        A->dPCurrentStep -= *NormalOfClosestFace*Inner(A->dPCurrentStep, *NormalOfClosestFace);
+            V3 NewPoint = GJKMaxMinkowski((V3 *) A->RigidBody.Colliders[IndexA].VertexRangeLowerIndex,
+                                          (V3 *) A->RigidBody.Colliders[IndexA].VertexRangeOnePastUpperIndex,
+                                          A->Position + A->dPCurrentStep,
+                                          (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeLowerIndex,
+                                          (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeOnePastUpperIndex,
+                                          B->Position, SearchDirection);
+            Simplex[SimplexSize++] = NewPoint;
+            SearchDirection = -NewPoint;
+            while(Collides < 0)
+            {
+                NewPoint = GJKMaxMinkowski((V3 *) A->RigidBody.Colliders[IndexA].VertexRangeLowerIndex,
+                                           (V3 *) A->RigidBody.Colliders[IndexA].VertexRangeOnePastUpperIndex,
+                                           A->Position + A->dPCurrentStep,
+                                           (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeLowerIndex,
+                                           (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeOnePastUpperIndex,
+                                           B->Position, SearchDirection);
+                if(Inner(NewPoint, SearchDirection) < 0)
+                {
+                    Collides = 0;
+                }
+                else
+                {
+                    for(uint32 s = 0;
+                        (s < SimplexSize) && (Collides < 0);
+                        ++s)
+                    {
+                        if(Simplex[s] == NewPoint)
+                        {
+                            Collides = false;
+                        }
+                    }
+                    if(Collides < 0)
+                    {
+                        Simplex[SimplexSize++] = NewPoint;
+                        if(GJKProcessSimplex(Simplex, &SimplexSize, &SearchDirection))
+                        {
+                            Collides = true;
+                        }
+                    }
+                }
+            }
+
+            if(Collides)
+            {
+#if 1
+                Assert((SimplexSize == 4));
+                V3 Polytope[10][3] = {
+                    {Simplex[3], Simplex[2], Simplex[1]},
+                    {Simplex[3], Simplex[1], Simplex[0]},
+                    {Simplex[3], Simplex[2], Simplex[0]},
+                    {Simplex[2], Simplex[1], Simplex[0]}
+                };
+                uint32 PolytopeSize = 4;
+
+                while(!Intersection)
+                {
+                    real32 LeastDistanceFromOrigin = (real32)0x2FFFFFFF;
+                    V3 *LeastDistantFace = 0;
+                    V3 NormalOfSelectedFace = {};
+                    for(uint32 FaceIndex = 0;
+                        FaceIndex < PolytopeSize;
+                        ++FaceIndex)
+                    {
+                        V3 *Face = (V3 *)&Polytope[FaceIndex];
+                        V3 Normal = Normalize(Cross(Face[1] - Face[0], Face[2] - Face[0]));
+                        real32 DistanceFromOrigin = Inner(Normal, -Face[0]);
+                        if(DistanceFromOrigin > 0)
+                        {
+                            Normal = -Normal;
+                        }
+                        else
+                        {
+                            DistanceFromOrigin = -DistanceFromOrigin;
+                        }
+                        if(DistanceFromOrigin < LeastDistanceFromOrigin)
+                        {
+                            LeastDistanceFromOrigin = DistanceFromOrigin;
+                            LeastDistantFace = Face;
+                            NormalOfSelectedFace = Normal;
+                        }
+                    }
+
+                    NewPoint = GJKMaxMinkowski((V3 *) A->RigidBody.Colliders[IndexA].VertexRangeLowerIndex,
+                                               (V3 *) A->RigidBody.Colliders[IndexA].VertexRangeOnePastUpperIndex,
+                                               A->Position + A->dPCurrentStep,
+                                               (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeLowerIndex,
+                                               (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeOnePastUpperIndex,
+                                               B->Position, NormalOfSelectedFace);
+
+                    bool IsAlreadyInPolytope = false;
+                    for(uint32 FaceIndex = 0;
+                        (FaceIndex < PolytopeSize) && !IsAlreadyInPolytope;
+                        ++FaceIndex)
+                    {
+                        V3 *Face = (V3 *)&Polytope[FaceIndex];
+                        IsAlreadyInPolytope = (Face[0] == NewPoint);
+                        IsAlreadyInPolytope = IsAlreadyInPolytope || (Face[1] == NewPoint);
+                        IsAlreadyInPolytope = IsAlreadyInPolytope || (Face[2] == NewPoint);
+                    }
+                    if(IsAlreadyInPolytope)
+                    {
+                        // TODO(dave): return currently selected face
+                        Intersection = LeastDistanceFromOrigin*NormalOfSelectedFace;
+                    }
+                    else
+                    {
+                        uint32 FacesToCull[3] = {};
+                        uint32 CullCount = 0;
+                        for(uint32 FaceIndex = 0;
+                            FaceIndex < PolytopeSize;
+                            ++FaceIndex)
+                        {
+                            V3 *Face = (V3 *)&Polytope[FaceIndex];
+                            V3 Normal = Normalize(Cross(Face[1] - Face[0], Face[2] - Face[0]));
+                            if(SAME_DIRECTION(Normal, -Face[0]))
+                            {
+                                Normal = -Normal;
+                            }
+                            if(SAME_DIRECTION(Normal, -NewPoint))
+                            {
+                                FacesToCull[CullCount++] = FaceIndex;
+                            }
+                        }
+                        switch(CullCount)
+                        {
+                            case 1:
+                                {
+                                    V3 TempFace[3] = {Polytope[FacesToCull[0]][0], Polytope[FacesToCull[0]][1], Polytope[FacesToCull[0]][2]};
+                                    Polytope[FacesToCull[0]][0] = TempFace[0];
+                                    Polytope[FacesToCull[0]][1] = TempFace[1];
+                                    Polytope[FacesToCull[0]][2] = NewPoint;
+                                    Polytope[PolytopeSize][0] = TempFace[0];
+                                    Polytope[PolytopeSize][1] = TempFace[2];
+                                    Polytope[PolytopeSize++][2] = NewPoint;
+                                    Polytope[PolytopeSize][0] = TempFace[1];
+                                    Polytope[PolytopeSize][1] = TempFace[2];
+                                    Polytope[PolytopeSize++][2] = NewPoint;
+                                } break;
+
+                            case 2:
+                                {
+                                    Polytope[PolytopeSize][0] = Polytope[FacesToCull[0]][0];
+                                    Polytope[PolytopeSize][1] = Polytope[FacesToCull[0]][2];
+                                    Polytope[PolytopeSize++][2] = NewPoint;
+                                    Polytope[FacesToCull[0]][2] = NewPoint;
+
+                                    Polytope[PolytopeSize][0] = Polytope[FacesToCull[1]][0];
+                                    Polytope[PolytopeSize][1] = Polytope[FacesToCull[1]][2];
+                                    Polytope[PolytopeSize++][2] = NewPoint;
+                                    Polytope[FacesToCull[1]][2] = NewPoint;
+                                } break;
+
+                            case 3:
+                                {
+                                    uint32 CommonPointsFace0[2] = {};
+                                    uint32 CommonPointsFace1[2] = {};
+                                    uint32 CommonPointFace0 = 0;
+                                    uint32 CommonPointFace1 = 0;
+                                    uint32 CommonPointFace2 = 0;
+                                    for(uint32 i = 0;
+                                        (i < 3) && (CommonPointsFace1[1] == 0);
+                                        ++i)
+                                    {
+                                        for(uint32 j = 0;
+                                            (j < 3) && (CommonPointsFace1[1] == 0);
+                                            ++j)
+                                        {
+                                            if(Polytope[FacesToCull[0]][i] == Polytope[FacesToCull[1]][j])
+                                            {
+                                                if(CommonPointsFace0[0])
+                                                {
+                                                    CommonPointsFace0[1] = i+1;
+                                                    CommonPointsFace1[1] = j+1;
+                                                }
+                                                else
+                                                {
+                                                    CommonPointsFace0[0] = i+1;
+                                                    CommonPointsFace1[0] = j+1;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    CommonPointsFace0[0]--;
+                                    CommonPointsFace0[1]--;
+                                    CommonPointsFace1[0]--;
+                                    CommonPointsFace1[1]--;
+                                    for(uint32 k = 0;
+                                        k < 3;
+                                        ++k)
+                                    {
+                                        if(Polytope[FacesToCull[2]][k] == Polytope[FacesToCull[0]][CommonPointsFace0[0]])
+                                        {
+                                            CommonPointFace0 = CommonPointsFace0[0];
+                                            CommonPointFace1 = CommonPointsFace1[0];
+                                            CommonPointFace2 = k;
+                                        }
+                                        else if(Polytope[FacesToCull[2]][k] == Polytope[FacesToCull[0]][CommonPointsFace0[1]])
+                                        {
+                                            CommonPointFace0 = CommonPointsFace0[1];
+                                            CommonPointFace1 = CommonPointsFace1[1];
+                                            CommonPointFace2 = k;
+                                        }
+                                    }
+                                    Polytope[FacesToCull[0]][CommonPointFace0] = NewPoint;
+                                    Polytope[FacesToCull[1]][CommonPointFace1] = NewPoint;
+                                    Polytope[FacesToCull[2]][CommonPointFace2] = NewPoint;
+                                } break;
+
+                                default:
+                                {
+                                    // TODO(dave): Deal with this case
+                                    Assert(0);
+                                } break;
+                        }
+                    }
+
+                }
+#else
+                    real32 LeastDistance = (real32)0x2FFFFFFF;
+                    V3 *NormalOfClosestFace = 0;
+                    uint32 *FaceArrayEnd = B->RigidBody.Colliders[IndexB].Faces + B->RigidBody.Colliders[IndexB].FaceCount*8;
+                    for(uint32 *Face = B->RigidBody.Colliders[IndexB].Faces;
+                        Face < FaceArrayEnd;
+                        Face += 8)
+                    {
+                        V3 *Normal = (V3 *)(B->RigidBody.VN + (Face[1]-1)*3);
+                        if(Inner(*Normal, A->dPCurrentStep) < 0)
+                        {
+                            Assert((Face[1] == Face[3]) && (Face[1] == Face[5]) && (Face[1] == Face[7]));
+                            V3 *vA = (V3 *)(B->RigidBody.VP + (Face[0]-1)*3);
+                            V3 *vB = (V3 *)(B->RigidBody.VP + (Face[2]-1)*3);
+                            V3 *vC = (V3 *)(B->RigidBody.VP + (Face[4]-1)*3);
+                            V3 *vD = (V3 *)(B->RigidBody.VP + (Face[6]-1)*3);
+                            real32 LenA = LengthSq(*vA - (A->Position + A->dPCurrentStep));
+                            real32 LenB = LengthSq(*vB - (A->Position + A->dPCurrentStep));
+                            real32 LenC = LengthSq(*vC - (A->Position + A->dPCurrentStep));
+                            real32 LenD = LengthSq(*vD - (A->Position + A->dPCurrentStep));
+                            real32 CurrentDistance = (LenA + LenB + LenC + LenD);
+                            if(CurrentDistance*CurrentDistance < LeastDistance)
+                            {
+                                LeastDistance = CurrentDistance;
+                                NormalOfClosestFace = Normal;
+                            }
+                        }
+                    }
+
+                    A->dPCurrentStep -= *NormalOfClosestFace*Inner(A->dPCurrentStep, *NormalOfClosestFace);
+                    Collides = -1;
+#endif
+            }
+        }
     }
     ThrowError("GJK: %s\n\n", Collides ? "Colliding" : "Not Colliding");
-    return(Collides);
+    return(Intersection);
 }
 
 internal void
@@ -611,7 +845,7 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
                                                    "shaders/lightv.glsl",
                                                    "shaders/lightf.glsl");
         debug_file SceneObj = Memory->SDLPlatformReadEntireFile("scene.obj");
-        debug_file SceneBodyObj = Memory->SDLPlatformReadEntireFile("test.obj");
+        debug_file SceneBodyObj = Memory->SDLPlatformReadEntireFile("scene_body.obj");
         debug_file PlayerObj = Memory->SDLPlatformReadEntireFile("player.obj");
         debug_file PlayerBodyObj = Memory->SDLPlatformReadEntireFile("player_body.obj");
         debug_file LightObj = Memory->SDLPlatformReadEntireFile("light.obj");
@@ -622,12 +856,12 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
 
         //State->Scene.nColliders = 1;
         //State->Scene.Colliders = PushArray(&State->MemoryPool, State->Scene.nColliders, collider);
-        State->Scene.RigidBody = RigidBodyFromOBJ(&SceneBodyObj, &State->MemoryPool);
+        CollidersFromOBJIntoMesh(&SceneBodyObj, &State->MemoryPool, &State->Scene);
         //State->Scene.Colliders[0].Center = {-30.1332f, 0.635283f, -29.2653f};
         //State->Scene.Colliders[0].Radius = {6.5669f, 0.635283f, 7.303f};
         //State->Player.nColliders = 1;
         //State->Player.Colliders = PushArray(&State->MemoryPool, State->Player.nColliders, collider);
-        State->Player.RigidBody = RigidBodyFromOBJ(&PlayerBodyObj, &State->MemoryPool);
+        CollidersFromOBJIntoMesh(&PlayerBodyObj, &State->MemoryPool, &State->Player);
         //State->Player.Colliders[0].Center = {0.000000f, 0.999445f, 0.000000f};
         //State->Player.Colliders[0].Radius = {0.258501f, 0.999445f, 0.313644f};
 
@@ -680,12 +914,9 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
 
     V3 ddPVector = State->Camera.Space.V*Input->LX.Value;
     ddPVector += -State->Camera.Space.N*Input->LY.Value;
-    ddPVector.Y = 0.f;//-9.81f;
-    //if((Input->A.Value) && (State->Player.dPosition.Y == 0.f))
-    //{
-    //    ddPVector.Y += 30*9.81f;
-    //}
+    ddPVector.Y = 0.f;
     State->Player.ddPosition = 40.f*ddPVector;
+    //State->Player.ddPosition.Y = -9.81f*(1.f-Input->A.Value) + 4.f*9.81f*Input->A.Value;
 
     while(*SecondsToAdvance >= PHYSICS_TIMESTEP) // 1/120
     {
@@ -698,29 +929,18 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
         V3 Friction = 7.f*State->Player.dPosition;
         Friction.Y = 0;
         State->Player.ddPosition -= Friction;
-        V3 Movement = (State->Player.dPosition*PHYSICS_TIMESTEP +
+        State->Player.dPCurrentStep = (State->Player.dPosition*PHYSICS_TIMESTEP +
                        0.5f*State->Player.ddPosition*Square(PHYSICS_TIMESTEP));
-        State->Player.dPCurrentStep = Movement;
 
-        bool32 Collision = CollisionAfterMovement(&State->Player, &State->Scene);
+        V3 Collision = CollisionAfterMovement(&State->Player, &State->Scene);
+
         if(Collision)
         {
-            Movement.X = 0.f;
-            Movement.Y = 0.f;
-            Movement.Z = 0.f;
+            real32 Modulus = Length(Collision);
+            Collision.Y = 0;
+            Collision = Modulus*Normalize(Collision);
+            State->Player.dPCurrentStep -= Collision;
         }
-//        if(Collision & 0x1)
-//        {
-//            Movement.X = 0;
-//        }
-//        if(Collision & 0x2)
-//        {
-//            Movement.Y = 0;
-//        }
-//        if(Collision & 0x4)
-//        {
-//            Movement.Z = 0;
-//        }
         State->Player.Position += State->Player.dPCurrentStep;
         State->Camera.Position += State->Player.dPCurrentStep;
         State->Camera.Target +=   State->Player.dPCurrentStep;

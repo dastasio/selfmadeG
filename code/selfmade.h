@@ -68,29 +68,47 @@ PopMemoryPoolToIndex(memory_pool *Pool, uint8 *TargetIndex)
     }
 }
 
+struct debug_obj_object
+{
+    real32 *VStart;
+    real32 *VOnePastEnd;
+    uint32 *F;
+    uint32 IndexCount;
+};
+
 struct debug_obj_file
 {
     real32 *VP;
     real32 *VN;
     real32 *VT;
-    uint32 *F;
-    uint32 IndexCount;
+
+    debug_obj_object *Objects;
+    uint32 ObjectCount;
+
     uint32 VertexCount;
     uint32 ComponentsPerVertex;
     
     uint8 *DataOffsetInMemoryPool;
 };
 
-struct rigid_body
+struct collision_box
+{
+    // NOTE(dave): 
+    // Each face has 4 position indices and 4 normal indices
+    real32 *VertexRangeLowerIndex;
+    real32 *VertexRangeOnePastUpperIndex;
+    uint32 *Faces;
+    uint32 FaceCount;
+};
+
+struct collision_set
 {
     real32 *VP;
     real32 *VN;
+    uint32 TotalVertexCount;
 
-    // NOTE(dave): 
-    // Each face has 4 position indices and 4 normal indices
-    uint32 *Faces;
-    uint32 FCount;
-    uint32 VCount;
+    uint32 ColliderCount;
+    collision_box *Colliders;
 };
 
 struct mesh_data
@@ -102,7 +120,7 @@ struct mesh_data
     GLuint   vao;
     GLuint   bo[2];
 
-    rigid_body RigidBody;
+    collision_set RigidBody;
     V3 Scale;
     V3 Rotation;
     V3 Position;

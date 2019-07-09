@@ -96,6 +96,12 @@ union V3
         real32 Z;
     };
     real32 E[3];
+
+    inline operator bool()
+    {
+        bool Result = X || Y || Z;
+        return(Result);
+    }
 };
 
 union V4
@@ -186,6 +192,13 @@ operator/=(V3 &A, real32 B)
 {
     A = A / B;
     return(A);
+}
+
+inline bool
+operator!(V3 A)
+{
+    bool Result = !(A.X || A.Y || A.Z);
+    return(Result);
 }
 
 inline bool

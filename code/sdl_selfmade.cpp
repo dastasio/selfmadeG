@@ -176,21 +176,25 @@ main()
                         NewInput->RT.Value = STICK_VALUE(RawRT);
                     }
 #if 1
-                    if (KeyboardState[SDL_SCANCODE_W])
+                    if(KeyboardState[SDL_SCANCODE_W])
                     {
                         NewInput->LY.Value = -1.f;
                     }
-                    if (KeyboardState[SDL_SCANCODE_S])
+                    if(KeyboardState[SDL_SCANCODE_S])
                     {
                         NewInput->LY.Value = 1.f;
                     }
-                    if (KeyboardState[SDL_SCANCODE_D])
+                    if(KeyboardState[SDL_SCANCODE_D])
                     {
                         NewInput->LX.Value = 1.f;
                     }
-                    if (KeyboardState[SDL_SCANCODE_A])
+                    if(KeyboardState[SDL_SCANCODE_A])
                     {
                         NewInput->LX.Value = -1.f;
+                    }
+                    if(KeyboardState[SDL_SCANCODE_SPACE])
+                    {
+                        NewInput->A.Value = 1.f;
                     }
 #endif
                     CurrentTime = SDL_GetTicks();
