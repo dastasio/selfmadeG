@@ -192,6 +192,22 @@ main()
                     {
                         NewInput->LX.Value = -1.f;
                     }
+                    if(KeyboardState[SDL_SCANCODE_I])
+                    {
+                        NewInput->RY.Value = -0.4f;
+                    }
+                    if(KeyboardState[SDL_SCANCODE_K])
+                    {
+                        NewInput->RY.Value = 0.4f;
+                    }
+                    if(KeyboardState[SDL_SCANCODE_L])
+                    {
+                        NewInput->RX.Value = 0.4f;
+                    }
+                    if(KeyboardState[SDL_SCANCODE_J])
+                    {
+                        NewInput->RX.Value = -0.4f;
+                    }
                     if(KeyboardState[SDL_SCANCODE_SPACE])
                     {
                         NewInput->A.Value = 1.f;

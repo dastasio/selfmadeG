@@ -297,7 +297,15 @@ Normalize(V3 Vector)
     real32 Modulus = LengthSq(Vector);
     if(Modulus != 1.f)
     {
-        Result /= SquareRoot32(Modulus);
+        Assert(Modulus >= 0.f);
+        if(Modulus == 0.f)
+        {
+            Result = {};
+        }
+        else
+        {
+            Result /= SquareRoot32(Modulus);
+        }
     }
     return(Result);
 };

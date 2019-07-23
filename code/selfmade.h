@@ -8,7 +8,6 @@
    ======================================================================== */
 
 #include "selfmade_platform.h"
-#include "selfmade_math.h"
 
 //#define 2PI 6.28318530718f
 #define  PI 3.14159265358f
@@ -16,10 +15,11 @@
 #define PHYSICS_TIMESTEP 0.008333333333333f
 
 #if SELFX_SLOW
-#define Assert(x) if(!x) {*(int *)0 = 0;}
+#define Assert(x) if(!(x)) {*(int *)0 = 0;}
 #else
 #define Assert(x)
 #endif
+#include "selfmade_math.h"
 
 #if SELFX_INTERNAL
 #define ThrowErrorAndExit(error, ...) { printf("[ERROR]" ## error, __VA_ARGS__); std::cin.ignore(); exit(EXIT_FAILURE); }
@@ -30,6 +30,7 @@
 #endif
 
 #define BUFFER_OFFSET(x) ((void *)(x)) 
+#define ArraySize(x) (sizeof((x)) / sizeof((x)[0]))
 
 struct memory_pool
 {
@@ -152,6 +153,8 @@ struct game_state
 {
     uint32 ShadingProgram;
     uint32 LightProgram;
+    uint32 LineProgram;
+    uint32 LineVAO;
     mesh_data Scene;
     mesh_data Player;
     light_data MainLight;

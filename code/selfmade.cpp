@@ -307,6 +307,34 @@ CompileShaderProgram(sdl_platform_read_entire_file SDLPlatformReadEntireFile,
     return Program;
 }
 
+#define LINE_MAX_NUMBER 100
+global_variable V3 LineBuffer[LINE_MAX_NUMBER][3];
+global_variable uint32 LineCount = 0;
+
+internal void
+DrawLine(V3 A, V3 B, V3 Color)
+{
+    //glDisable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glLineWidth(4);
+    glUniform3fv(2, 1, &A.E[0]);
+    glUniform3fv(3, 1, &B.E[0]);
+    glUniform3f(4, Color.X, Color.Y, Color.Z);
+    glDrawArrays(GL_LINES, 0, 2);
+    glEnable(GL_DEPTH_TEST);
+}
+
+internal void
+DrawPoint(V3 P, V3 Color)
+{
+    //glDisable(GL_DEPTH_TEST);
+    glPointSize(10);
+    glUniform3fv(2, 1, &P.E[0]);
+    glUniform3f(4, Color.X, Color.Y, Color.Z);
+    glDrawArrays(GL_POINTS, 0, 1);
+    glEnable(GL_DEPTH_TEST);
+}
+
 internal V3 *
 FarthestPointInDirection(V3 Direction, V3 *PointsStart, V3 *PointsOnePastEnd)
 {
@@ -558,6 +586,7 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
     bool32 Collides = -1;
     V3 Intersection = {};
 
+    //ThrowError("Position: (%f; %f; %f)\n", A->Position.X, A->Position.Y, A->Position.Z);
     for(uint32 IndexA = 0;
         (IndexA < A->RigidBody.ColliderCount) && (Collides != 1);
         ++IndexA)
@@ -579,6 +608,7 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                                           B->Position, SearchDirection);
             Simplex[SimplexSize++] = NewPoint;
             SearchDirection = -NewPoint;
+            V3 OldPoint = {};
             while(Collides < 0)
             {
                 NewPoint = GJKMaxMinkowski((V3 *) A->RigidBody.Colliders[IndexA].VertexRangeLowerIndex,
@@ -593,13 +623,20 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                 }
                 else
                 {
-                    for(uint32 s = 0;
-                        (s < SimplexSize) && (Collides < 0);
-                        ++s)
+                    if(OldPoint == NewPoint)
                     {
-                        if(Simplex[s] == NewPoint)
+                        Collides = false;
+                    }
+                    else
+                    {
+                        for(uint32 s = 0;
+                            (s < SimplexSize) && (Collides < 0);
+                            ++s)
                         {
-                            Collides = false;
+                            if(Absolute(Inner(NewPoint, SearchDirection) - Inner(Simplex[s], SearchDirection)) < 0.01f)
+                            {
+                                Collides = false;
+                            }
                         }
                     }
                     if(Collides < 0)
@@ -609,6 +646,7 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                         {
                             Collides = true;
                         }
+                        OldPoint = NewPoint;
                     }
                 }
             }
@@ -625,7 +663,10 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                 };
                 uint32 PolytopeSize = 4;
 
-                while(!Intersection)
+                LineCount = 0;
+                real32 LineColor = 0.f;
+                int32 MaxIterations = 10;
+                while(!Intersection && (MaxIterations-- >= 0))
                 {
                     real32 LeastDistanceFromOrigin = (real32)0x2FFFFFFF;
                     V3 *LeastDistantFace = 0;
@@ -636,6 +677,7 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                     {
                         V3 *Face = (V3 *)&Polytope[FaceIndex];
                         V3 Normal = Normalize(Cross(Face[1] - Face[0], Face[2] - Face[0]));
+                        ThrowError("Normal: (%f; %f; %f)\n", Normal.X, Normal.Y, Normal.Z);
                         real32 DistanceFromOrigin = Inner(Normal, -Face[0]);
                         if(DistanceFromOrigin > 0)
                         {
@@ -643,7 +685,7 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                         }
                         else
                         {
-                            DistanceFromOrigin = -DistanceFromOrigin;
+                            DistanceFromOrigin *= -1.f;
                         }
                         if(DistanceFromOrigin < LeastDistanceFromOrigin)
                         {
@@ -651,7 +693,27 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                             LeastDistantFace = Face;
                             NormalOfSelectedFace = Normal;
                         }
+
+                        Assert(LineCount < ArraySize(LineBuffer));
+                        //LineBuffer[LineCount][0] = Face[0];
+                        //LineBuffer[LineCount][1] = Face[1];
+                        //LineBuffer[LineCount++][2] = {LineColor, LineColor, 0.f};
+                        //LineBuffer[LineCount][0] = Face[0];
+                        //LineBuffer[LineCount][1] = Face[2];
+                        //LineBuffer[LineCount++][2] = {LineColor, LineColor, 0.f};
+                        //LineBuffer[LineCount][0] = Face[1];
+                        //LineBuffer[LineCount][1] = Face[2];
+                        //LineBuffer[LineCount++][2] = {LineColor, LineColor, 0.f};
                     }
+                    //LineBuffer[LineCount][0] = LeastDistantFace[0];
+                    //LineBuffer[LineCount][1] = LeastDistantFace[1];
+                    //LineBuffer[LineCount++][2] = {0.f, LineColor, LineColor};
+                    //LineBuffer[LineCount][0] = LeastDistantFace[0];
+                    //LineBuffer[LineCount][1] = LeastDistantFace[2];
+                    //LineBuffer[LineCount++][2] = {0.f, LineColor, LineColor};
+                    //LineBuffer[LineCount][0] = LeastDistantFace[1];
+                    //LineBuffer[LineCount][1] = LeastDistantFace[2];
+                    //LineBuffer[LineCount++][2] = {0.f, LineColor, LineColor};
 
                     NewPoint = GJKMaxMinkowski((V3 *) A->RigidBody.Colliders[IndexA].VertexRangeLowerIndex,
                                                (V3 *) A->RigidBody.Colliders[IndexA].VertexRangeOnePastUpperIndex,
@@ -659,6 +721,7 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                                                (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeLowerIndex,
                                                (V3 *) B->RigidBody.Colliders[IndexB].VertexRangeOnePastUpperIndex,
                                                B->Position, NormalOfSelectedFace);
+                    LineColor += 0.5f;
 
                     bool IsAlreadyInPolytope = false;
                     for(uint32 FaceIndex = 0;
@@ -670,11 +733,16 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                         IsAlreadyInPolytope = IsAlreadyInPolytope || (Face[1] == NewPoint);
                         IsAlreadyInPolytope = IsAlreadyInPolytope || (Face[2] == NewPoint);
                     }
-                    if(IsAlreadyInPolytope)
+                    if(
+                       (Inner(NewPoint, NormalOfSelectedFace) - LeastDistanceFromOrigin) < 0.001f)
                     {
-                        // TODO(dave): return currently selected face
                         Intersection = LeastDistanceFromOrigin*NormalOfSelectedFace;
                     }
+                    //if(IsAlreadyInPolytope)
+                    //{
+                    //    // TODO(dave): return currently selected face
+                    //    Intersection = LeastDistanceFromOrigin*NormalOfSelectedFace;
+                    //}
                     else
                     {
                         uint32 FacesToCull[3] = {};
@@ -689,101 +757,210 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
                             {
                                 Normal = -Normal;
                             }
-                            if(SAME_DIRECTION(Normal, -NewPoint))
+                            if(SAME_DIRECTION(Normal, NewPoint))
                             {
                                 FacesToCull[CullCount++] = FaceIndex;
                             }
                         }
                         switch(CullCount)
                         {
-                            case 1:
+                            case 0:
+                            {
+                                V3 FreePoints[10];
+                                uint32 FreePointsCount = 0;
+                                for(uint32 FaceIndex0 = 0;
+                                    FaceIndex0 < PolytopeSize;
+                                    ++FaceIndex0)
                                 {
-                                    V3 TempFace[3] = {Polytope[FacesToCull[0]][0], Polytope[FacesToCull[0]][1], Polytope[FacesToCull[0]][2]};
-                                    Polytope[FacesToCull[0]][0] = TempFace[0];
-                                    Polytope[FacesToCull[0]][1] = TempFace[1];
-                                    Polytope[FacesToCull[0]][2] = NewPoint;
-                                    Polytope[PolytopeSize][0] = TempFace[0];
-                                    Polytope[PolytopeSize][1] = TempFace[2];
+                                    V3 *Face0 = (V3 *)&Polytope[FaceIndex0];
+                                    V3 Edges[3][2] = {
+                                        {Face0[0], Face0[1]},
+                                        {Face0[0], Face0[2]},
+                                        {Face0[1], Face0[2]}
+                                    };
+                                    V3 *Edge = Edges[0];
+                                    while(Edge <= Edges[2])
+                                    {
+                                        bool EdgeIsShared = false;
+                                        for(uint32 FaceIndex1 = 0;
+                                            (FaceIndex1 < PolytopeSize) && !EdgeIsShared;
+                                            ++FaceIndex1)
+                                        {
+                                            if(FaceIndex1 != FaceIndex0)
+                                            {
+                                                V3 *Face1 = (V3 *)&Polytope[FaceIndex1];
+                                                bool FirstEdgeVertexIsShared = ((Edge[0] == Face1[0]) ||
+                                                                                (Edge[0] == Face1[1]) ||
+                                                                                (Edge[0] == Face1[2]));
+                                                bool SecondEdgeVertexIsShared = ((Edge[1] == Face1[0]) ||
+                                                                                 (Edge[1] == Face1[1]) ||
+                                                                                 (Edge[1] == Face1[2]));
+                                                EdgeIsShared = (FirstEdgeVertexIsShared &&
+                                                                SecondEdgeVertexIsShared);
+                                            }
+                                        }
+                                        if(!EdgeIsShared)
+                                        {
+                                            FreePoints[FreePointsCount++] = Edge[0];
+                                            FreePoints[FreePointsCount++] = Edge[1];
+                                        }
+                                        Edge += 2;
+                                    }
+                                }
+                                Assert((FreePointsCount < ArraySize(FreePoints)));
+                                for(uint32 FreePointIndex = 0;
+                                    FreePointIndex < FreePointsCount;
+                                    )
+                                {
+                                    //Assert(NewPoint != FreePoints[FreePointIndex]);
+                                    Polytope[PolytopeSize][0] = FreePoints[FreePointIndex++];
+                                    //Assert(NewPoint != FreePoints[FreePointIndex]);
+                                    Polytope[PolytopeSize][1] = FreePoints[FreePointIndex++];
                                     Polytope[PolytopeSize++][2] = NewPoint;
-                                    Polytope[PolytopeSize][0] = TempFace[1];
-                                    Polytope[PolytopeSize][1] = TempFace[2];
-                                    Polytope[PolytopeSize++][2] = NewPoint;
-                                } break;
+                                }
+                            } break;
+
+                            case 1:
+                            {
+                                V3 TempFace[3] = {
+                                    Polytope[FacesToCull[0]][0],
+                                    Polytope[FacesToCull[0]][1],
+                                    Polytope[FacesToCull[0]][2]
+                                };
+                                Polytope[FacesToCull[0]][0] = TempFace[0];
+                                Polytope[FacesToCull[0]][1] = TempFace[1];
+                                Polytope[FacesToCull[0]][2] = NewPoint;
+                                Polytope[PolytopeSize][0] = TempFace[0];
+                                Polytope[PolytopeSize][1] = TempFace[2];
+                                Polytope[PolytopeSize++][2] = NewPoint;
+                                Polytope[PolytopeSize][0] = TempFace[1];
+                                Polytope[PolytopeSize][1] = TempFace[2];
+                                Polytope[PolytopeSize++][2] = NewPoint;
+                            } break;
 
                             case 2:
-                                {
-                                    Polytope[PolytopeSize][0] = Polytope[FacesToCull[0]][0];
-                                    Polytope[PolytopeSize][1] = Polytope[FacesToCull[0]][2];
-                                    Polytope[PolytopeSize++][2] = NewPoint;
-                                    Polytope[FacesToCull[0]][2] = NewPoint;
+                            {
+                                Polytope[PolytopeSize][0] = Polytope[FacesToCull[0]][0];
+                                Polytope[PolytopeSize][1] = Polytope[FacesToCull[0]][2];
+                                Polytope[PolytopeSize++][2] = NewPoint;
+                                Polytope[FacesToCull[0]][2] = NewPoint;
 
-                                    Polytope[PolytopeSize][0] = Polytope[FacesToCull[1]][0];
-                                    Polytope[PolytopeSize][1] = Polytope[FacesToCull[1]][2];
-                                    Polytope[PolytopeSize++][2] = NewPoint;
-                                    Polytope[FacesToCull[1]][2] = NewPoint;
-                                } break;
+                                Polytope[PolytopeSize][0] = Polytope[FacesToCull[1]][0];
+                                Polytope[PolytopeSize][1] = Polytope[FacesToCull[1]][2];
+                                Polytope[PolytopeSize++][2] = NewPoint;
+                                Polytope[FacesToCull[1]][2] = NewPoint;
+                            } break;
 
                             case 3:
+                            {
+                                uint32 CommonPointsFace0[2] = {4, 4};
+                                uint32 CommonPointsFace1[2] = {4, 4};
+                                uint32 CommonPointFace0 = 4;
+                                uint32 CommonPointFace1 = 4;
+                                uint32 CommonPointFace2 = 4;
+                                for(uint32 i = 0;
+                                    (i < 3) && (CommonPointsFace1[1] == 4);
+                                    ++i)
                                 {
-                                    uint32 CommonPointsFace0[2] = {};
-                                    uint32 CommonPointsFace1[2] = {};
-                                    uint32 CommonPointFace0 = 0;
-                                    uint32 CommonPointFace1 = 0;
-                                    uint32 CommonPointFace2 = 0;
-                                    for(uint32 i = 0;
-                                        (i < 3) && (CommonPointsFace1[1] == 0);
-                                        ++i)
+                                    for(uint32 j = 0;
+                                        (j < 3) && (CommonPointsFace1[1] == 4);
+                                        ++j)
                                     {
-                                        for(uint32 j = 0;
-                                            (j < 3) && (CommonPointsFace1[1] == 0);
-                                            ++j)
+                                        if(Polytope[FacesToCull[0]][i] == Polytope[FacesToCull[1]][j])
                                         {
-                                            if(Polytope[FacesToCull[0]][i] == Polytope[FacesToCull[1]][j])
+                                            if(CommonPointsFace0[0])
                                             {
-                                                if(CommonPointsFace0[0])
-                                                {
-                                                    CommonPointsFace0[1] = i+1;
-                                                    CommonPointsFace1[1] = j+1;
-                                                }
-                                                else
-                                                {
-                                                    CommonPointsFace0[0] = i+1;
-                                                    CommonPointsFace1[0] = j+1;
-                                                }
+                                                CommonPointsFace0[1] = i;
+                                                CommonPointsFace1[1] = j;
+                                            }
+                                            else
+                                            {
+                                                CommonPointsFace0[0] = i;
+                                                CommonPointsFace1[0] = j;
                                             }
                                         }
                                     }
-                                    CommonPointsFace0[0]--;
-                                    CommonPointsFace0[1]--;
-                                    CommonPointsFace1[0]--;
-                                    CommonPointsFace1[1]--;
-                                    for(uint32 k = 0;
-                                        k < 3;
-                                        ++k)
-                                    {
-                                        if(Polytope[FacesToCull[2]][k] == Polytope[FacesToCull[0]][CommonPointsFace0[0]])
-                                        {
-                                            CommonPointFace0 = CommonPointsFace0[0];
-                                            CommonPointFace1 = CommonPointsFace1[0];
-                                            CommonPointFace2 = k;
-                                        }
-                                        else if(Polytope[FacesToCull[2]][k] == Polytope[FacesToCull[0]][CommonPointsFace0[1]])
-                                        {
-                                            CommonPointFace0 = CommonPointsFace0[1];
-                                            CommonPointFace1 = CommonPointsFace1[1];
-                                            CommonPointFace2 = k;
-                                        }
-                                    }
-                                    Polytope[FacesToCull[0]][CommonPointFace0] = NewPoint;
-                                    Polytope[FacesToCull[1]][CommonPointFace1] = NewPoint;
-                                    Polytope[FacesToCull[2]][CommonPointFace2] = NewPoint;
-                                } break;
-
-                                default:
+                                }
+                                for(uint32 k = 0;
+                                    k < 3;
+                                    ++k)
                                 {
-                                    // TODO(dave): Deal with this case
-                                    Assert(0);
-                                } break;
+                                    if(Polytope[FacesToCull[2]][k] == Polytope[FacesToCull[0]][CommonPointsFace0[0]])
+                                    {
+                                        CommonPointFace0 = CommonPointsFace0[0];
+                                        CommonPointFace1 = CommonPointsFace1[0];
+                                        CommonPointFace2 = k;
+                                    }
+                                    else if(Polytope[FacesToCull[2]][k] == Polytope[FacesToCull[0]][CommonPointsFace0[1]])
+                                    {
+                                        CommonPointFace0 = CommonPointsFace0[1];
+                                        CommonPointFace1 = CommonPointsFace1[1];
+                                        CommonPointFace2 = k;
+                                    }
+                                }
+                                Polytope[FacesToCull[0]][CommonPointFace0] = NewPoint;
+                                Polytope[FacesToCull[1]][CommonPointFace1] = NewPoint;
+                                Polytope[FacesToCull[2]][CommonPointFace2] = NewPoint;
+                            } break;
+
+                            default:
+                            {
+                                V3 FreePoints[20];
+                                uint32 FreePointsCount = 0;
+                                for(uint32 FaceIndex0 = 0;
+                                    FaceIndex0 < CullCount;
+                                    ++FaceIndex0)
+                                {
+                                    V3 *Face0 = (V3 *)&Polytope[FacesToCull[FaceIndex0]];
+                                    V3 Edges[3][2] = {
+                                        {Face0[0], Face0[1]},
+                                        {Face0[0], Face0[2]},
+                                        {Face0[1], Face0[2]}
+                                    };
+                                    V3 *Edge = Edges[0];
+                                    while(Edge <= Edges[2])
+                                    {
+                                        bool EdgeIsShared = false;
+                                        for(uint32 FaceIndex1 = 0;
+                                            (FaceIndex1 < CullCount) && !EdgeIsShared;
+                                            ++FaceIndex1)
+                                        {
+                                            if(FaceIndex1 != FaceIndex0)
+                                            {
+                                                V3 *Face1 = (V3 *)&Polytope[FacesToCull[FaceIndex1]];
+                                                bool FirstEdgeVertexIsShared = ((Edge[0] == Face1[0]) ||
+                                                                                (Edge[0] == Face1[1]) ||
+                                                                                (Edge[0] == Face1[2]));
+                                                bool SecondEdgeVertexIsShared = ((Edge[1] == Face1[0]) ||
+                                                                                 (Edge[1] == Face1[1]) ||
+                                                                                 (Edge[1] == Face1[2]));
+                                                EdgeIsShared = (FirstEdgeVertexIsShared &&
+                                                                SecondEdgeVertexIsShared);
+                                            }
+                                        }
+                                        if(!EdgeIsShared)
+                                        {
+                                            FreePoints[FreePointsCount++] = Edge[0];
+                                            FreePoints[FreePointsCount++] = Edge[1];
+                                        }
+                                        Edge += 2;
+                                    }
+                                }
+                                Assert((FreePointsCount < ArraySize(FreePoints)));
+                                for(uint32 FreePointIndex = 0;
+                                    FreePointIndex < FreePointsCount;
+                                    )
+                                {
+                                    uint32 PolytopeIndex = ((FreePointIndex < CullCount) ?
+                                                            FacesToCull[FreePointIndex] :
+                                                            PolytopeSize++);
+                                    //Assert(NewPoint != FreePoints[FreePointIndex]);
+                                    Polytope[PolytopeIndex][0] = FreePoints[FreePointIndex++];
+                                    //Assert(NewPoint != FreePoints[FreePointIndex]);
+                                    Polytope[PolytopeIndex][1] = FreePoints[FreePointIndex++];
+                                    Polytope[PolytopeIndex][2] = NewPoint;
+                                }
+                            } break;
                         }
                     }
 
@@ -823,7 +1000,8 @@ CollisionAfterMovement(mesh_data *A, mesh_data *B)
             }
         }
     }
-    ThrowError("GJK: %s\n\n", Collides ? "Colliding" : "Not Colliding");
+    //ThrowError("GJK: %s\n\n", Collides ? "Colliding" : "Not Colliding");
+    //ThrowError("Intersection: (%f; %f; %f)\n", Intersection.X, Intersection.Y, Intersection.Z);
     return(Intersection);
 }
 
@@ -844,6 +1022,9 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
         State->LightProgram = CompileShaderProgram(Memory->SDLPlatformReadEntireFile,
                                                    "shaders/lightv.glsl",
                                                    "shaders/lightf.glsl");
+        State->LineProgram = CompileShaderProgram(Memory->SDLPlatformReadEntireFile,
+                                                  "shaders/linev.glsl",
+                                                  "shaders/linef.glsl");
         debug_file SceneObj = Memory->SDLPlatformReadEntireFile("scene.obj");
         debug_file SceneBodyObj = Memory->SDLPlatformReadEntireFile("scene_body.obj");
         debug_file PlayerObj = Memory->SDLPlatformReadEntireFile("player.obj");
@@ -851,8 +1032,8 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
         debug_file LightObj = Memory->SDLPlatformReadEntireFile("light.obj");
         State->Scene =  MeshFromOBJ(&SceneObj, &State->MemoryPool);
         State->Player = MeshFromOBJ(&PlayerObj, &State->MemoryPool);
-        State->Player.Position = {0.f, 0.5f, 0.f};
-        //State->Player.Position = {-30.f, 0.5f, -29.f};
+        //State->Player.Position = {0.f, 0.5f, 0.f};
+        State->Player.Position = {7.47f, 0.5f, -22.25f};//{-30.f, 0.5f, -29.f};
 
         //State->Scene.nColliders = 1;
         //State->Scene.Colliders = PushArray(&State->MemoryPool, State->Scene.nColliders, collider);
@@ -868,9 +1049,13 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
         State->MainLight.Mesh = MeshFromOBJ(&LightObj, &State->MemoryPool);
         State->MainLight.Mesh.Position = {0.f, 25.f, 0.f};
         State->MainLight.Color = {1.f, 1.f, 1.f};
-        State->Camera.Target = {0.f, 1.7f, 0.f};
+        State->Camera.Target = {7.47f, 2.2f, -22.25f};//{0.f, 1.7f, 0.f};
+        //State->Camera.Target += State->Player.Position;
         State->Camera.Up = {0.f, 1.f, 0.f};
-        State->Camera.DistanceFromTarget = 2.f;
+        State->Camera.DistanceFromTarget = 5.f;
+        State->Camera.Yaw = -PI/4.f;
+        State->Camera.Pitch = PI/6.f;
+        State->Camera.Position = {4.7f, 4.56f, -19.7f};
 
         //glDisable(GL_CULL_FACE);
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -895,6 +1080,18 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
         //glGenerateMipmap(GL_TEXTURE_2D);
         //stbi_image_free(ImageData);
 
+        GLfloat LineData[] = {0.f, 1.f};
+        uint32 LineVBO;
+        glGenVertexArrays(1, &State->LineVAO);
+        glBindVertexArray(State->LineVAO);
+
+        glGenBuffers(1, &LineVBO);
+        glBindBuffer(GL_ARRAY_BUFFER, LineVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(LineData), LineData, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
+        glEnableVertexAttribArray(0);
+
         Memory->IsInitialized = true;
     }
 
@@ -918,8 +1115,11 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
     State->Player.ddPosition = 40.f*ddPVector;
     //State->Player.ddPosition.Y = -9.81f*(1.f-Input->A.Value) + 4.f*9.81f*Input->A.Value;
 
+    V3 TotalCollision = {};
+    ThrowError("Starting Frame Calculation\n");
     while(*SecondsToAdvance >= PHYSICS_TIMESTEP) // 1/120
     {
+        ThrowError("PositionA: (%f; %f; %f)\n", State->Player.Position.X, State->Player.Position.Y, State->Player.Position.Z);
         State->Player.dPosition = State->Player.dPosition + State->Player.ddPosition*PHYSICS_TIMESTEP;
         //if((State->Player.Position.Y <= 0.f) && (State->Player.dPosition.Y < 0.f))
         //{
@@ -932,19 +1132,24 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
         State->Player.dPCurrentStep = (State->Player.dPosition*PHYSICS_TIMESTEP +
                        0.5f*State->Player.ddPosition*Square(PHYSICS_TIMESTEP));
 
+        ThrowError("PositionB: (%f; %f; %f)\n", State->Player.Position.X, State->Player.Position.Y, State->Player.Position.Z);
         V3 Collision = CollisionAfterMovement(&State->Player, &State->Scene);
+        ThrowError("CollisionA: (%f; %f; %f)\n", Collision.X, Collision.Y, Collision.Z);
 
         if(Collision)
         {
+            TotalCollision += Collision;
             real32 Modulus = Length(Collision);
             Collision.Y = 0;
             Collision = Modulus*Normalize(Collision);
             State->Player.dPCurrentStep -= Collision;
+            ThrowError("CollisionB: (%f; %f; %f)\n", Collision.X, Collision.Y, Collision.Z);
         }
         State->Player.Position += State->Player.dPCurrentStep;
         State->Camera.Position += State->Player.dPCurrentStep;
         State->Camera.Target +=   State->Player.dPCurrentStep;
         *SecondsToAdvance -= PHYSICS_TIMESTEP;
+        ThrowError("PositionC: (%f; %f; %f)\n\n", State->Player.Position.X, State->Player.Position.Y, State->Player.Position.Z);
     }
 
     M4 CameraMatrix = ComputeCameraSpace(&State->Camera.Space,
@@ -978,4 +1183,18 @@ UpdateAndRender(memory_block *Memory, input *Input, real32 *SecondsToAdvance)
     glUniform3fv(3, 1, &State->MainLight.Color.E[0]);
     glBindVertexArray(State->MainLight.Mesh.vao);
     glDrawElements(GL_TRIANGLES, State->MainLight.Mesh.nIndices, GL_UNSIGNED_INT, 0);
+
+    glUseProgram(State->LineProgram);
+    glBindVertexArray(State->LineVAO);
+    glUniformMatrix4fv(1, 1, false, &ScreenSpaceTransform.E[0][0]);
+    DrawLine(State->Player.Position, State->Player.Position + State->Player.dPCurrentStep*50.f, {0.7f, 0.3f, 0.5f});
+    //DrawLine(State->Player.Position, State->Player.Position + TotalCollision*50.f, {0.3f, 0.5f, 0.7f});
+
+    DrawPoint({}, {0.f, 0.f, 0.f});
+    for(uint32 Line = 0;
+        Line < LineCount;
+        ++Line)
+    {
+        DrawLine(LineBuffer[Line][0], LineBuffer[Line][1], LineBuffer[Line][2]);
+    }
 }
